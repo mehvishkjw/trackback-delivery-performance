@@ -1,0 +1,1042 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>TrackBack · Delivery Crisis Diagnostic</title>
+<meta name="description" content="An AI diagnostic that reads orders, warehouses, routes, staffing, inventory and delivery data, finds why parcels are late, and simulates the fixes.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  color-scheme:light;
+  --paper:#f6f0e4;--card:#fffdf9;--ink:#12203a;--ink2:#4a5570;--ink3:#6f788d;--line:#e4dbc6;--hair:#eee7d6;--wash:#f1eadb;
+  --c1:#2a78d6;--c2:#eb6834;--c3:#1baf7a;--c4:#eda100;--c5:#9aa3b5;
+  --good:#0ca30c;--warn:#fab219;--serious:#ec835a;--crit:#d03b3b;
+  --brand:#ff5a1f;--tape:#ffcf33;--ontime:#c9d5ea;
+  --r1:#cde2fb;--r2:#9ec5f4;--r3:#6da7ec;--r4:#3987e5;--r5:#256abf;--r6:#184f95;--r7:#0d366b;
+  --shadow:0 1px 0 rgba(18,32,58,.04),0 10px 30px -14px rgba(18,32,58,.25);
+  --f-d:'Archivo',system-ui,sans-serif;--f-b:'Atkinson Hyperlegible',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:where(:not([data-theme="light"])){
+  color-scheme:dark;--paper:#121316;--card:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--ink3:#a09f94;--line:#32322f;--hair:#2a2a28;--wash:#222220;
+  --c1:#3987e5;--c2:#d95926;--c3:#199e70;--c4:#c98500;--c5:#6c7385;--ontime:#3a4152;--shadow:0 10px 30px -14px rgba(0,0,0,.7);
+  --r1:#1f3550;--r2:#1f4a7c;--r3:#1c5cab;--r4:#2a78d6;--r5:#3987e5;--r6:#6da7ec;--r7:#9ec5f4}}
+:root[data-theme="dark"]{
+  color-scheme:dark;--paper:#121316;--card:#1a1a19;--ink:#f0efec;--ink2:#c3c2b7;--ink3:#a09f94;--line:#32322f;--hair:#2a2a28;--wash:#222220;
+  --c1:#3987e5;--c2:#d95926;--c3:#199e70;--c4:#c98500;--c5:#6c7385;--ontime:#3a4152;--shadow:0 10px 30px -14px rgba(0,0,0,.7);
+  --r1:#1f3550;--r2:#1f4a7c;--r3:#1c5cab;--r4:#2a78d6;--r5:#3987e5;--r6:#6da7ec;--r7:#9ec5f4}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:74px}
+body{margin:0;background:var(--paper);color:var(--ink);font:400 16px/1.55 var(--f-b);-webkit-font-smoothing:antialiased}
+h1,h2,h3,h4{font-family:var(--f-d);margin:0;line-height:1.08;letter-spacing:-.01em}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--c1);outline-offset:2px;border-radius:6px}
+.tape{height:12px;background:repeating-linear-gradient(-45deg,var(--tape) 0 14px,#12203a 14px 28px)}
+.app{display:grid;grid-template-columns:104px minmax(0,1fr);max-width:1380px;margin:0 auto}
+/* rail */
+.rail{position:sticky;top:0;height:100vh;padding:22px 0;display:flex;flex-direction:column;align-items:center}
+.logo{display:flex;flex-direction:column;align-items:center;gap:6px;text-decoration:none;color:var(--ink);margin-bottom:22px}
+.logo b{font:900 13px/1 var(--f-d);letter-spacing:.06em;text-transform:uppercase;font-stretch:112%}
+.logo svg{width:38px;height:38px}
+.track{position:relative;flex:1;display:flex;flex-direction:column;justify-content:space-between;align-items:center;padding:8px 0 18px}
+.track:before{content:"";position:absolute;top:18px;bottom:30px;left:50%;width:0;border-left:3px dotted var(--line);transform:translateX(-50%)}
+.track .prog{position:absolute;top:18px;left:50%;width:3px;transform:translateX(-50%);background:var(--brand);border-radius:2px;height:0;transition:height .25s}
+.stop{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:4px;text-decoration:none;color:var(--ink2);font:700 11px/1 var(--f-d);letter-spacing:.04em;text-transform:uppercase}
+.stop i{width:30px;height:30px;border-radius:50%;background:var(--card);border:2.5px solid var(--line);display:grid;place-items:center;font:800 12px/1 var(--f-d);font-style:normal;transition:.2s}
+.stop.on i{background:var(--brand);border-color:var(--brand);color:#fff;transform:scale(1.15)}
+.stop.on{color:var(--ink)}
+.stop.done i{border-color:var(--brand);color:var(--brand)}
+.themeBtn{margin-top:10px;width:36px;height:36px;border-radius:50%;border:2px solid var(--line);background:var(--card);display:grid;place-items:center}
+/* main */
+main{padding:0 28px 80px;min-width:0}
+.filters{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--paper) 92%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);margin:0 -28px;padding:10px 28px;display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.filters label{font:800 11px/1 var(--f-d);letter-spacing:.08em;text-transform:uppercase;color:var(--ink2)}
+.wks{display:flex;gap:6px;flex-wrap:wrap}
+.wk{min-width:38px;padding:7px 8px;border-radius:10px;border:1.5px solid var(--line);background:var(--card);font:700 13px/1 var(--f-d);position:relative}
+.wk:hover{border-color:var(--ink3)}
+.wk[aria-pressed=true]{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.wk.wkev:after{content:"";position:absolute;right:3px;top:3px;width:6px;height:6px;border-radius:50%;background:var(--brand)}
+.wkinfo{font-size:14px;color:var(--ink2)}
+.wkinfo b{color:var(--ink)}
+section{padding-top:46px}
+.eyebrow{display:inline-flex;align-items:center;gap:8px;font:800 12px/1 var(--f-d);letter-spacing:.12em;text-transform:uppercase;color:var(--ink2)}
+.eyebrow i{font-style:normal;background:var(--ink);color:var(--card);padding:4px 7px;border-radius:6px;letter-spacing:.06em}
+h2{font-size:clamp(28px,3.4vw,44px);font-stretch:108%;font-weight:850;margin:12px 0 10px}
+.lead{max-width:760px;color:var(--ink2);font-size:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:20px 22px;min-width:0}
+.card>header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
+.card h3{font-size:20px;font-weight:800;font-stretch:104%}
+.card .sub{color:var(--ink2);font-size:14px;margin-top:3px}
+.tbl{font:700 12px/1 var(--f-d);padding:7px 10px;border-radius:8px;border:1.5px solid var(--line);background:transparent;white-space:nowrap}
+.tbl[aria-pressed=true]{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.read{margin-top:12px;font-size:15px;color:var(--ink2);border-top:1px solid var(--hair);padding-top:10px}
+.read b{color:var(--ink)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px}
+.mt{margin-top:18px}
+/* hero */
+.hero{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:22px;align-items:stretch;margin-top:26px}
+.label-card{position:relative;background:var(--card);border:2px solid var(--ink);border-radius:20px;padding:26px 28px 24px;box-shadow:8px 8px 0 var(--ink)}
+.label-top{display:flex;justify-content:space-between;gap:12px;align-items:center;font:800 12px/1 var(--f-d);letter-spacing:.14em;text-transform:uppercase;color:var(--ink2);border-bottom:2px dashed var(--line);padding-bottom:14px}
+.bars{display:flex;gap:2px;height:22px;align-items:stretch}
+.bars i{display:block;background:var(--ink)}
+.stamp{position:absolute;right:22px;top:64px;transform:rotate(-8deg);border:3.5px solid var(--crit);color:var(--crit);padding:5px 12px;font:900 20px/1 var(--f-d);letter-spacing:.1em;border-radius:8px;opacity:.9;text-transform:uppercase;font-stretch:115%}
+.stamp.ok{border-color:var(--good);color:var(--good)}
+.hero h1{font-size:clamp(30px,4vw,54px);font-weight:900;font-stretch:112%;margin:22px 0 6px;max-width:min(100%,480px)}
+.hero-num{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:10px 0 4px}
+.hero-num b{font:900 clamp(64px,9vw,112px)/.9 var(--f-d);letter-spacing:-.04em;color:var(--ink)}
+.hero-num span{font:700 15px/1.3 var(--f-b);color:var(--ink2);max-width:240px}
+.delta{display:inline-flex;gap:6px;align-items:center;font:800 13px/1 var(--f-d);padding:6px 9px;border-radius:999px;background:color-mix(in srgb,var(--crit) 13%,transparent);color:var(--crit)}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:20px}
+.kpi{border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--wash)}
+.kpi small{display:block;font:700 11px/1.2 var(--f-d);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2)}
+.kpi b{display:block;font:850 24px/1.15 var(--f-d);margin-top:4px}
+.kpi em{display:block;font:400 12px/1.3 var(--f-b);font-style:normal;color:var(--ink3);margin-top:2px}
+.paradox{margin-top:16px;font-size:15px;color:var(--ink2);border-left:4px solid var(--tape);padding:2px 0 2px 12px}
+.rank{margin-top:18px;border-top:2px dashed var(--line);padding-top:14px;display:grid;gap:7px}
+.rank h4{font:800 12px/1 var(--f-d);letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);margin-bottom:2px}
+.rk{display:grid;grid-template-columns:120px minmax(0,1fr) 64px;gap:10px;align-items:center;font-size:14px}
+.rk div{height:12px;border-radius:6px;background:var(--hair);overflow:hidden}.rk div i{display:block;height:100%;border-radius:6px}
+.rk b{font:850 14px/1 var(--f-d);text-align:right}
+.movers{margin-top:12px;display:grid;gap:8px}
+.mv{display:flex;justify-content:space-between;gap:10px;font-size:14px;border-bottom:1px solid var(--hair);padding-bottom:6px;color:var(--ink2)}.mv b{font:850 14px/1 var(--f-d);color:var(--crit)}
+.waffle-card{display:flex;flex-direction:column}
+.waffle{display:grid;grid-template-columns:repeat(10,1fr);grid-auto-flow:column;grid-template-rows:repeat(10,1fr);gap:5px;margin:8px 0 12px;flex:1}
+.waffle button{border:0;padding:0;border-radius:6px;aspect-ratio:1;min-width:0;background:var(--ontime);transition:transform .15s,background .4s;position:relative}
+.waffle button:hover{transform:scale(1.18);z-index:2}
+.waffle button.late{box-shadow:inset 0 0 0 2px color-mix(in srgb,#000 12%,transparent)}
+.lg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--ink2);margin:2px 0 6px}
+.lg span{display:inline-flex;align-items:center;gap:6px;cursor:default}
+.lg i{width:12px;height:12px;border-radius:3px;display:inline-block}
+.lg.line i{height:3px;width:16px;border-radius:2px}
+.dom{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px;margin-top:22px}
+.dom button{text-align:left;background:var(--card);border:1.5px solid var(--line);border-radius:14px;padding:12px 12px 10px;display:flex;flex-direction:column;gap:3px;transition:.2s}
+.dom button:hover,.dom button[aria-expanded=true]{border-color:var(--ink);transform:translateY(-2px)}
+.dom svg{width:26px;height:26px;color:var(--brand)}
+.dom b{font:800 14px/1.1 var(--f-d)}
+.dom small{color:var(--ink3);font-size:12px;line-height:1.3}
+.dom strong{font:850 18px/1 var(--f-d);margin-top:4px}
+.domnote{margin-top:10px;background:var(--wash);border-radius:12px;padding:12px 16px;font-size:15px;color:var(--ink2);min-height:48px}
+/* tracker */
+.tracker{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+.tk-top{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.chip{font:700 13px/1 var(--f-d);padding:8px 12px;border-radius:999px;border:1.5px solid var(--line);background:var(--card)}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--card);border-color:var(--ink)}
+.chip.go{background:var(--brand);border-color:var(--brand);color:#fff}
+.tl{position:relative;margin:8px 0 0 10px;padding-left:34px}
+.tl:before{content:"";position:absolute;left:11px;top:6px;bottom:6px;border-left:3px solid var(--line)}
+.ev{position:relative;padding:0 0 18px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 14px}
+.ev:last-child{padding-bottom:0}
+.ev:before{content:"";position:absolute;left:-30px;top:3px;width:16px;height:16px;border-radius:50%;background:var(--card);border:3px solid var(--ink3)}
+.ev.slow:before{border-color:var(--crit);background:var(--crit)}
+.ev.fin:before{border-color:var(--good);background:var(--good)}
+.ev b{font:800 15px/1.2 var(--f-d)}
+.ev span{color:var(--ink2);font-size:14px;grid-column:1}
+.ev time{font:700 13px/1.2 var(--f-d);color:var(--ink2);grid-row:1;grid-column:2;text-align:right;white-space:nowrap}
+.ev u{grid-column:2;grid-row:2;text-decoration:none;font:800 12px/1 var(--f-d);color:var(--crit);text-align:right}
+.verdict{border-radius:14px;padding:14px 16px;background:var(--wash);border:1.5px solid var(--line);display:grid;gap:8px}
+.verdict h4{font-size:17px}
+.exrow{display:grid;grid-template-columns:130px minmax(0,1fr) 54px;gap:8px;align-items:center;font-size:13px;color:var(--ink2)}
+.exrow div{height:10px;border-radius:5px;background:var(--hair);overflow:hidden}
+.exrow div i{display:block;height:100%;border-radius:5px}
+.exrow b{font:800 12px/1 var(--f-d);color:var(--ink);text-align:right}
+/* map */
+.mapwrap{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.75fr);gap:18px}
+.hexsvg{width:100%;height:auto;display:block}
+.hex{cursor:pointer;transition:opacity .2s,fill .4s}
+.hex:hover{filter:brightness(1.08)}
+.ramp{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink2);margin-top:6px}
+.ramp div{flex:1;max-width:220px;height:10px;border-radius:5px;background:linear-gradient(90deg,var(--r1),var(--r2),var(--r3),var(--r4),var(--r5),var(--r6),var(--r7))}
+.fcs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:10px}
+.fc{border:1.5px solid var(--line);border-radius:12px;padding:10px 12px;background:var(--wash)}
+.fc h4{font-size:15px;display:flex;align-items:center;gap:8px}
+.fc h4 i{font-style:normal;width:22px;height:22px;border-radius:50%;background:var(--ink);color:var(--card);display:grid;place-items:center;font:800 12px/1 var(--f-d)}
+.fc dl{margin:6px 0 0;display:grid;grid-template-columns:1fr auto;gap:2px 8px;font-size:13px;color:var(--ink2)}
+.fc dd{margin:0;font:800 13px/1.3 var(--f-d);color:var(--ink);text-align:right}
+.wz{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:10px;align-items:center;width:100%;text-align:left;border:0;background:transparent;padding:9px 4px;border-bottom:1px solid var(--hair);font-size:14.5px}
+.wz:hover{background:var(--wash)}
+.wz b{font:850 14px/1 var(--f-d)}
+.zpanel h3{font-size:24px}
+.zpanel .tags{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 12px}
+.tag{font:800 11px/1 var(--f-d);letter-spacing:.06em;text-transform:uppercase;background:var(--wash);border:1px solid var(--line);padding:5px 8px;border-radius:999px;color:var(--ink2)}
+.meter{margin:8px 0}
+.meter div.t{display:flex;justify-content:space-between;font-size:14px;color:var(--ink2)}
+.meter div.t b{font:800 14px/1 var(--f-d);color:var(--ink)}
+.meter div.m{height:10px;border-radius:5px;background:var(--hair);margin-top:5px;overflow:hidden}
+.meter div.m i{display:block;height:100%;border-radius:5px;background:var(--c1)}
+/* causes */
+.tabs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.tab{text-align:left;border:1.5px solid var(--line);background:var(--card);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:4px;position:relative;overflow:hidden;transition:.2s}
+.tab:before{content:"";position:absolute;left:0;top:0;bottom:0;width:6px;background:var(--tc)}
+.tab:hover{transform:translateY(-2px)}
+.tab[aria-selected=true]{border-color:var(--ink);box-shadow:5px 5px 0 var(--ink);transform:translate(-2px,-2px)}
+.tab small{font:800 11px/1 var(--f-d);letter-spacing:.1em;text-transform:uppercase;color:var(--ink2);padding-left:6px}
+.tab b{font:850 18px/1.15 var(--f-d);padding-left:6px}
+.tab strong{font:900 30px/1 var(--f-d);padding-left:6px;letter-spacing:-.02em}
+.tab em{font-style:normal;font-size:12.5px;color:var(--ink3);padding-left:6px}
+.evid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,.7fr);gap:18px;margin-top:18px}
+.facts{display:grid;gap:10px;align-content:start}
+.fact{border:1.5px solid var(--line);border-radius:14px;padding:12px 14px;background:var(--wash)}
+.fact b{font:900 28px/1 var(--f-d);letter-spacing:-.02em;display:block}
+.fact span{font-size:14px;color:var(--ink2)}
+.why{font-size:16px;color:var(--ink2)}
+.why b{color:var(--ink)}
+/* fixit */
+.presets{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 14px}
+.sim{display:grid;grid-template-columns:minmax(0,.9fr) minmax(0,1.1fr);gap:18px}
+.levers{display:grid;gap:12px}
+.lever{background:var(--card);border:1.5px solid var(--line);border-radius:16px;padding:14px 16px;display:grid;gap:6px;position:relative}
+.lever:before{content:"";position:absolute;left:0;top:14px;bottom:14px;width:5px;border-radius:0 4px 4px 0;background:var(--lc)}
+.lever header{display:flex;justify-content:space-between;gap:8px;align-items:baseline;padding-left:6px}
+.lever h4{font-size:16px}
+.lever output{font:850 18px/1 var(--f-d)}
+.lever p{font-size:13.5px;color:var(--ink2);padding-left:6px}
+.lever .eff{font:800 10.5px/1 var(--f-d);letter-spacing:.08em;text-transform:uppercase;color:var(--ink3);padding-left:6px}
+.sw{display:flex;align-items:center;gap:10px;padding-left:6px;font-size:14px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:8px;border-radius:4px;background:linear-gradient(90deg,var(--lc) var(--p,0%),var(--hair) var(--p,0%))}
+input[type=range]::-moz-range-track{height:8px;border-radius:4px;background:var(--hair)}
+input[type=range]::-moz-range-progress{height:8px;border-radius:4px;background:var(--lc)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--card);border:4px solid var(--lc);margin-top:-8px;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+input[type=range]::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:var(--card);border:4px solid var(--lc)}
+.toggle{appearance:none;width:44px;height:26px;border-radius:13px;background:var(--hair);border:1.5px solid var(--line);position:relative;cursor:pointer;margin:0;transition:.2s;flex:none}
+.toggle:after{content:"";position:absolute;left:2px;top:2px;width:19px;height:19px;border-radius:50%;background:var(--card);box-shadow:0 1px 3px rgba(0,0,0,.35);transition:.2s}
+.toggle:checked{background:var(--lc);border-color:var(--lc)}
+.toggle:checked:after{left:20px}
+.result{position:sticky;top:70px;align-self:start;display:grid;gap:14px}
+.big2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.bigstat{border-radius:16px;padding:14px 16px;border:1.5px solid var(--line);background:var(--wash)}
+.bigstat small{font:800 11px/1.2 var(--f-d);letter-spacing:.08em;text-transform:uppercase;color:var(--ink2)}
+.bigstat b{display:block;font:900 clamp(34px,4vw,52px)/1 var(--f-d);letter-spacing:-.03em;margin:6px 0 4px}
+.bigstat span{font-size:13px;color:var(--ink2)}
+.up{color:var(--good)} .dn{color:var(--crit)}
+/* plan */
+.plan{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;counter-reset:p}
+.act{border:1.5px solid var(--line);background:var(--card);border-radius:18px;padding:18px 20px 16px;position:relative;display:grid;gap:8px}
+.act:before{counter-increment:p;content:counter(p);position:absolute;right:16px;top:12px;font:900 54px/1 var(--f-d);color:var(--hair)}
+.act h3{font-size:19px;padding-right:50px}
+.act .meta{display:flex;gap:6px;flex-wrap:wrap}
+.act ul{margin:0;padding-left:18px;color:var(--ink2);font-size:15px}
+.gain{font:900 26px/1 var(--f-d);color:var(--good)}
+.tbl-radar{width:100%;border-collapse:collapse;font-size:14.5px}
+.tbl-radar th{font:800 11px/1 var(--f-d);letter-spacing:.08em;text-transform:uppercase;color:var(--ink2);text-align:left;padding:8px 10px;border-bottom:2px solid var(--line)}
+.tbl-radar td{padding:10px;border-bottom:1px solid var(--hair)}
+.st{display:inline-flex;gap:6px;align-items:center;font:800 12px/1 var(--f-d);padding:5px 9px;border-radius:999px;background:color-mix(in srgb,var(--sc) 14%,transparent);color:var(--ink);white-space:nowrap}
+.st i{font-style:normal;width:16px;height:16px;border-radius:50%;background:var(--sc);color:#fff;display:grid;place-items:center;font-size:10px}
+.flow{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:6px}
+.fl{background:var(--wash);border:1.5px solid var(--line);border-radius:14px;padding:14px;position:relative}
+.fl:not(:last-child):after{content:"→";position:absolute;right:-13px;top:50%;transform:translateY(-50%);font:900 18px/1 var(--f-d);color:var(--brand);z-index:1}
+.fl h4{font-size:15px;margin-bottom:4px}.fl p{font-size:13.5px;color:var(--ink2)}
+.note{margin-top:14px;font-size:14px;color:var(--ink2);background:var(--wash);border-radius:12px;padding:12px 14px;border:1px dashed var(--ink3)}
+footer{margin-top:50px;color:var(--ink3);font-size:13px;border-top:1px solid var(--line);padding-top:16px}
+/* svg + tooltip */
+svg text{font-family:var(--f-b);fill:var(--ink2);font-size:12px}
+.tip{position:fixed;z-index:100;pointer-events:none;display:none;background:var(--card);color:var(--ink);border:1px solid var(--ink3);border-radius:10px;padding:9px 11px;box-shadow:0 12px 30px -8px rgba(0,0,0,.4);font-size:13px;max-width:290px}
+.tip .tt{font:800 13px/1.2 var(--f-d);margin-bottom:5px}
+.tip .tr{display:flex;align-items:center;gap:8px;line-height:1.5}
+.tip .tr i{width:14px;height:3px;border-radius:2px;flex:none}
+.tip .tr b{font:800 13px/1 var(--f-d)}
+.tip .tr span{color:var(--ink2)}
+.tip .tn{margin-top:5px;color:var(--ink2);font-size:12px;border-top:1px solid var(--hair);padding-top:5px}
+table.dt{width:100%;border-collapse:collapse;font-size:13.5px}
+table.dt th,table.dt td{padding:6px 8px;border-bottom:1px solid var(--hair);text-align:right}
+table.dt th:first-child,table.dt td:first-child{text-align:left}
+table.dt th{font:800 11px/1 var(--f-d);letter-spacing:.06em;text-transform:uppercase;color:var(--ink2)}
+.tblscroll{max-height:310px;overflow:auto}
+.viz{position:relative;min-width:0;transition:opacity .25s}
+.viz.busy{opacity:.45}
+/* loader */
+#boot{position:fixed;inset:0;z-index:200;background:var(--paper);display:grid;place-items:center;transition:opacity .5s}
+#boot.gone{opacity:0;pointer-events:none}
+.bootcard{width:min(520px,92vw);background:var(--card);border:2px solid var(--ink);border-radius:20px;padding:26px;box-shadow:8px 8px 0 var(--ink)}
+.bootcard h2{font-size:26px;margin:6px 0 6px}
+.pbar{height:12px;border-radius:6px;background:var(--hair);overflow:hidden;margin:14px 0 12px}
+.pbar i{display:block;height:100%;width:0;background:repeating-linear-gradient(-45deg,var(--brand) 0 10px,#ff8a5c 10px 20px);transition:width .3s}
+.bootdom{display:flex;gap:6px;flex-wrap:wrap}
+.bootdom span{font:800 12px/1 var(--f-d);padding:6px 9px;border-radius:999px;border:1.5px solid var(--line);color:var(--ink3);transition:.3s}
+.bootdom span.on{background:var(--ink);color:var(--card);border-color:var(--ink)}
+@media (max-width:1100px){
+  .hero,.mapwrap,.evid,.sim{grid-template-columns:1fr}
+  .dom{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .tabs{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .result{position:static}
+}
+@media (max-width:860px){
+  .app{grid-template-columns:minmax(0,1fr)}
+  .tape{margin:0 -16px!important}
+  .rail{min-width:0}.track{min-width:0;flex:1}
+  .rail{position:sticky;top:0;z-index:30;height:auto;flex-direction:row;padding:8px 12px;background:var(--paper);border-bottom:1px solid var(--line);gap:10px}
+  .logo{flex-direction:row;margin:0}.logo svg{width:28px;height:28px}
+  .track{flex-direction:row;padding:0;overflow-x:auto;gap:12px;justify-content:flex-start}
+  .track:before,.track .prog{display:none}
+  .stop{flex-direction:row;gap:6px;white-space:nowrap}.stop i{width:24px;height:24px;font-size:11px}
+  .themeBtn{margin:0;flex:none}
+  main{padding:0 16px 60px}.filters{margin:0 -16px;padding:10px 16px;top:49px}
+  html{scroll-padding-top:120px}
+  .grid2,.grid3,.plan,.flow{grid-template-columns:1fr}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .dom{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .fl:after{display:none}
+  .stamp{position:static;display:inline-block;margin-top:12px}
+  .label-card{box-shadow:5px 5px 0 var(--ink);padding:20px}
+  .big2{grid-template-columns:1fr}
+  .exrow{grid-template-columns:100px minmax(0,1fr) 46px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<div id="boot"><div class="bootcard">
+  <div class="eyebrow"><i>AI</i> Reading your operation</div>
+  <h2 id="bootT">Replaying 12 weeks of orders…</h2>
+  <div class="pbar"><i id="bootBar"></i></div>
+  <div class="bootdom" id="bootDom"><span>Orders</span><span>Warehouses</span><span>Routes</span><span>Staffing</span><span>Inventory</span><span>Delivery</span></div>
+</div></div>
+
+<div class="app">
+<nav class="rail" aria-label="Sections">
+  <a class="logo" href="#s1" aria-label="TrackBack home">
+    <svg viewBox="0 0 40 40" aria-hidden="true"><rect x="3" y="3" width="34" height="34" rx="10" fill="#ff5a1f"/><path d="M11 21l7 7 12-15" fill="none" stroke="#fff" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M11 11h8" stroke="#ffcf33" stroke-width="3.5" stroke-linecap="round"/></svg>
+    <b>TrackBack</b>
+  </a>
+  <div class="track" id="track"><div class="prog" id="prog"></div>
+    <a class="stop" href="#s1"><i>1</i>Alert</a>
+    <a class="stop" href="#s2"><i>2</i>Journey</a>
+    <a class="stop" href="#s3"><i>3</i>Map</a>
+    <a class="stop" href="#s4"><i>4</i>Causes</a>
+    <a class="stop" href="#s5"><i>5</i>Fix-it</a>
+    <a class="stop" href="#s6"><i>6</i>Plan</a>
+  </div>
+  <button class="themeBtn" id="theme" aria-label="Toggle light and dark theme" title="Light / dark"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M21 13A9 9 0 1111 3a7 7 0 0010 10z"/></svg></button>
+</nav>
+
+<main>
+  <div class="tape" style="margin:0 -28px"></div>
+  <div class="filters" role="group" aria-label="Week filter">
+    <label for="wkrow">Week</label>
+    <div class="wks" id="wkrow"></div>
+    <div class="wkinfo" id="wkinfo"></div>
+  </div>
+
+  <!-- 1 ALERT -->
+  <section id="s1" style="padding-top:26px">
+    <div class="eyebrow"><i>01</i> Delivery performance crisis</div>
+    <div class="hero">
+      <div class="label-card" id="heroCard">
+        <div class="label-top"><span>TrackBack · Parcel status</span><span class="bars" aria-hidden="true"><i style="width:3px"></i><i style="width:1px"></i><i style="width:4px"></i><i style="width:2px"></i><i style="width:1px"></i><i style="width:3px"></i><i style="width:5px"></i><i style="width:1px"></i><i style="width:2px"></i></span></div>
+        <div class="stamp" id="stamp">Delayed</div>
+        <h1 id="heroH">Parcels are arriving late.</h1>
+        <div class="hero-num"><b id="heroNum">–</b><span>of orders arrive by the promised time <span class="delta" id="heroDelta"></span></span></div>
+        <div class="kpis" id="kpis"></div>
+        <p class="paradox" id="paradox"></p>
+        <div class="rank" id="heroRank"></div>
+      </div>
+      <div class="card waffle-card">
+        <header><div><h3>100 parcels, 100 stories</h3><p class="sub" id="wafSub"></p></div></header>
+        <div class="waffle" id="waffle" role="list"></div>
+        <div class="lg" id="wafLg"></div>
+        <p class="read" id="wafRead"></p>
+      </div>
+    </div>
+    <div class="dom" id="dom" role="group" aria-label="Data domains the AI analyses"></div>
+    <div class="domnote" id="domnote" aria-live="polite">Select a data domain to see what the AI learned from it.</div>
+  </section>
+
+  <!-- 2 JOURNEY -->
+  <section id="s2">
+    <div class="eyebrow"><i>02</i> Follow the parcel</div>
+    <h2>When did the slide begin, and where do the hours go?</h2>
+    <p class="lead">Click any week in the chart to jump there. The AI replays every order through pick, pack, truck, line-haul and last mile and compares each stage with week 1.</p>
+    <div class="grid2 mt">
+      <div class="card"><header><div><h3>On-time delivery by week</h3><p class="sub">Orange dots mark events that changed the operation</p></div><button class="tbl" data-t="trend" aria-pressed="false">Table</button></header><div class="viz" id="c-trend"></div><p class="read" id="r-trend"></p></div>
+      <div class="card"><header><div><h3>Why late orders are late</h3><p class="sub">Late orders per week, by main cause</p></div><button class="tbl" data-t="stack" aria-pressed="false">Table</button></header><div class="viz" id="c-stack"></div><p class="read" id="r-stack"></p></div>
+    </div>
+    <div class="grid2 mt">
+      <div class="card"><header><div><h3>Where the hours go</h3><p class="sub">Average hours per order in each stage, week 1 vs selected week</p></div><button class="tbl" data-t="stage" aria-pressed="false">Table</button></header><div class="viz" id="c-stage"></div><div class="movers" id="movers"></div><p class="read" id="r-stage"></p></div>
+      <div class="card"><header><div><h3>Track a late order</h3><p class="sub">The AI rebuilds one real late order from the selected week</p></div></header>
+        <div class="tracker"><div class="tk-top" id="tkTop"></div><div class="tl" id="tl"></div><div class="verdict" id="verdict"></div></div></div>
+    </div>
+  </section>
+
+  <!-- 3 MAP -->
+  <section id="s3">
+    <div class="eyebrow"><i>03</i> Network map</div>
+    <h2>Four warehouses, 48 delivery zones: who is hurting?</h2>
+    <p class="lead">Every hexagon is a delivery zone. Switch the lens, then click a zone or a warehouse card to inspect it.</p>
+    <div class="mapwrap mt">
+      <div class="card"><header><div><h3>Zone heat map</h3><p class="sub" id="mapSub"></p></div></header>
+        <div class="tk-top" id="mapTabs" style="margin-bottom:8px"></div>
+        <div class="viz" id="c-map"></div>
+        <div class="ramp"><span id="rampLo">0%</span><div></div><span id="rampHi">40%</span><span style="margin-left:8px">◎ = warehouse</span></div>
+      </div>
+      <div style="display:grid;gap:18px;align-content:start">
+        <div class="card zpanel" id="zpanel"></div>
+        <div class="fcs" id="fcs"></div>
+        <div class="card"><header><div><h3>Hardest-hit zones</h3><p class="sub">Click one to open it on the map</p></div></header><div id="worst"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4 CAUSES -->
+  <section id="s4">
+    <div class="eyebrow"><i>04</i> Root causes</div>
+    <h2>Four problems hide behind one headline number</h2>
+    <p class="lead">For each cause the AI replays the same orders in a world where that one problem is fixed. The on-time points that come back are the cause's real cost.</p>
+    <div class="tabs mt" id="tabs" role="tablist"></div>
+    <div class="evid">
+      <div class="card"><header><div><h3 id="evT">–</h3><p class="sub" id="evS">–</p></div><button class="tbl" data-t="evid" aria-pressed="false">Table</button></header><div class="viz" id="c-evid"></div><p class="read why" id="evWhy"></p></div>
+      <div class="facts" id="facts"></div>
+    </div>
+  </section>
+
+  <!-- 5 FIX -->
+  <section id="s5">
+    <div class="eyebrow"><i>05</i> Fix-it console</div>
+    <h2>Pull the levers. Watch the parcels come back on time.</h2>
+    <p class="lead">Every slider re-runs the whole order replay for the selected week using the same orders, so the only thing that changes is your decision.</p>
+    <div class="presets" id="presets"></div>
+    <div class="sim">
+      <div class="levers" id="levers"></div>
+      <div class="result">
+        <div class="card">
+          <div class="big2" id="big2"></div>
+          <div class="mt"><h3 style="font-size:17px">Where the gain comes from</h3><p class="sub">On-time points added by each lever, in order</p></div>
+          <div class="viz" id="c-water"></div>
+          <p class="read" id="r-water"></p>
+        </div>
+      </div>
+    </div>
+    <div class="card mt"><header><div><h3>Next 12 weeks: do nothing vs balanced plan</h3><p class="sub">Orders keep growing about 2% a week and absence keeps rising. The plan starts in week 13.</p></div><button class="tbl" data-t="outlook" aria-pressed="false">Table</button></header><div class="viz" id="c-outlook"></div><p class="read" id="r-outlook"></p></div>
+  </section>
+
+  <!-- 6 PLAN -->
+  <section id="s6">
+    <div class="eyebrow"><i>06</i> Recommended operating plan</div>
+    <h2>What to do on Monday, in order of payoff</h2>
+    <p class="lead">Gains are measured on the selected week by replaying its orders with each fix applied on its own.</p>
+    <div class="plan mt" id="planCards"></div>
+    <div class="card mt"><header><div><h3>Early-warning radar</h3><p class="sub">Six signals that predicted the slide, on the selected week</p></div></header><div style="overflow-x:auto"><table class="tbl-radar" id="radar"></table></div></div>
+    <div class="card mt"><header><div><h3>How the AI works</h3><p class="sub">A digital twin of the fulfilment network</p></div></header>
+      <div class="flow">
+        <div class="fl"><h4>1 · Ingest</h4><p>Orders, warehouse picks, routes, rosters, stock positions and delivery scans share one clock.</p></div>
+        <div class="fl"><h4>2 · Replay</h4><p>Each order is walked through assignment, pick queue, pack, carrier truck, line-haul and a daily route queue.</p></div>
+        <div class="fl"><h4>3 · Attribute</h4><p>For every late order the AI tests which fix alone would have saved it, then ranks causes by recovered on-time points.</p></div>
+        <div class="fl"><h4>4 · Recommend</h4><p>Levers are simulated on the same orders, so every gain is a like-for-like replay.</p></div>
+      </div>
+      <p class="note"><b>About the data.</b> This demo runs on a simulated 12-week network of about 110,000 orders generated in your browser with a fixed seed. Plug the same pipeline into live order, WMS, TMS, rostering and carrier feeds to get the same diagnosis on your own operation. All figures on this page are model output, not measured results.</p>
+    </div>
+  </section>
+  <footer>TrackBack · AI delivery-performance diagnostic · single-file demo, no tracking, no external data</footer>
+</main>
+</div>
+<div class="tip" id="tip" role="tooltip"></div>
+<script>
+/* ==== SIM: synthetic e-commerce network, order-level journey replay ==== */
+const FCN = ['Northgate', 'Eastport', 'Southpark', 'Westfield'];
+const ZN = ["Harbor Point","Old Mill","Pinecrest","Rivergate","Maple Heights","Stonebridge","Cedar Hollow","Lakeshore","Fairview","Brookside","Eastgate","Westfield Park","Northgate Row","Southpark Row","Elmwood","Oakridge","Willow Bend","Highland","Meadowbrook","Silver Lake","Redwood","Summit","Ashford","Bayview","Cobblestone","Dunmore","Eagle Rock","Foxglove","Greenway","Hillcrest","Ivy Court","Jasper","Kingsbridge","Lindenwood","Millbrook","Newport","Orchard Park","Parkside","Quarry Hill","Ridgeway","Sunnyvale","Thornton","Union Square","Valley View","Wexford","Yarrow","Zephyr Flats","Crescent"];
+const ROWS = [4, 5, 6, 7, 8, 7, 6, 5], HS = 45, HW = Math.sqrt(3) * HS;
+const mul = a => { let s = a >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = Math.imul(s ^ s >>> 15, 1 | s); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
+const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+// geometry
+const ZONES = []; { let k = 0; ROWS.forEach((n, r) => { const off = (8 - n) / 2; for (let c = 0; c < n; c++) { ZONES.push({ id: k, name: ZN[k], r, c, x: (off + c + .5) * HW, y: r * 1.5 * HS + HS }); k++; } }); }
+const zAt = (r, c) => ZONES.find(z => z.r === r && z.c === c);
+const FCZ = [zAt(1, 3), zAt(3, 5), zAt(7, 3), zAt(2, 0)];
+const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y) / HW;
+{ const cx = 4 * HW, cy = 3.5 * 1.5 * HS + HS; const rg = mul(7);
+  ZONES.forEach(z => { z.home = 0; let b = 1e9; FCZ.forEach((f, i) => { const d = dist(z, f); if (d < b) { b = d; z.home = i; } });
+    z.dh = b; const dc = Math.hypot(z.x - cx, z.y - cy) / HW; z.cls = dc < 1.45 ? 0 : dc < 2.7 ? 1 : 2;
+    z.w = [3.4, 1.7, .75][z.cls] * (.85 + .3 * rg()); z.kc = [1.0, 1.45, 2.2][z.cls] * (.95 + .1 * rg()); z.pf = [.035, .025, .015][z.cls]; });
+  const tw = ZONES.reduce((a, z) => a + z.w, 0); ZONES.forEach(z => z.share = z.w / tw);
+  FCZ.forEach((f, i) => f.fc = i); }
+const BACKUP = FCZ.map((f, i) => { let best = -1, bd = 1e9; FCZ.forEach((g, j) => { if (j !== i) { const d = dist(f, g); if (d < bd) { bd = d; best = j; } } }); return best; });
+const DZ = ZONES.map(z => FCZ.map(f => dist(z, f)));          // zone x FC distance
+const FCSHARE = [0, 1, 2, 3].map(i => ZONES.filter(z => z.home === i).reduce((a, z) => a + z.share, 0));
+
+// demand shape
+const dayW = [1.12, 1.0, .95, .95, 1.0, 1.05, 1.08];
+const hourRaw = h => .12 + 1.0 * Math.exp(-Math.pow((h + .5 - 12.5) / 2.1, 2)) + 1.2 * Math.exp(-Math.pow((h + .5 - 20.5) / 1.9, 2)) + .45 * Math.exp(-Math.pow((h + .5 - 9) / 2, 2));
+const HSUM = Array.from({ length: 24 }, (_, h) => hourRaw(h)).reduce((a, b) => a + b, 0);
+const HSHAPE = Array.from({ length: 24 }, (_, h) => hourRaw(h) / HSUM);       // share of a day's orders per hour
+const LEG = [.9, .9, .9, .9, .9, .95, 1.05, 1.3, 1.45, 1.45, 1.4, .4, .34, .34, 1, 1.05, 1.05, 1.05, .55, .34, .3, .34, .9, .9];
+const norm24 = a => { const s = a.reduce((x, y) => x + y, 0) / 24; return a.map(v => v / s); };
+const LEGN = norm24(LEG), ALIGN = norm24(HSHAPE.map(v => .22 + v * 24 * .78));
+
+// week world
+const WEEK0 = new Date(Date.UTC(2026, 7, 3));                     // week 1 starts Mon Aug 3 2026
+const wkLabel = w => { const d = new Date(WEEK0.getTime() + (w - 1) * 7 * 864e5); return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getUTCMonth()] + ' ' + d.getUTCDate(); };
+const EVENTS = { 5: 'Late-summer sale lifts orders 30%', 7: 'Carrier moves the last pickup from 6 pm to 4 pm', 9: '1,800 new products spread stock thinner', 11: 'Absence climbs past 10% of pickers', 12: 'Flash sale on Tuesday and Wednesday' };
+function world(w) {
+  const g = w <= 12 ? 1 + .028 * (w - 1) : 1 + .028 * 11 + .02 * (w - 12);
+  const day = [1, 1, 1, 1, 1, 1, 1];
+  if (w === 5) [3, 4, 5, 6].forEach(d => day[d] = 1.3); if (w === 10) day[0] = 1.35; if (w === 12) { day[1] = 1.25; day[2] = 1.15; }
+  const ps0 = [.035, .095, .055, .07], k = 1 + .05 * (w - 1), step = w >= 9 ? [.008, .045, .02, .03] : [0, 0, 0, 0];
+  return { w, vol: Math.round(7600 * g), day, abs: w <= 12 ? .03 + .0075 * (w - 1) + (w >= 11 ? .025 : 0) : .1375 + .002 * (w - 12), ps: ps0.map((p, i) => p * k + step[i]), truck: w < 7 ? 18 : 16 };
+}
+const HEAD = 1.88, V1 = 7600;
+const rate = 1;                                                  // capacity unit = orders per hour
+function genWeek(w) {
+  const W = world(w), r = mul(1000 + w * 77), n = W.vol;
+  const inten = []; let tot = 0; for (let d = 0; d < 7; d++) for (let h = 0; h < 24; h++) { const v = dayW[d] * W.day[d] * HSHAPE[h]; inten.push(v); tot += v; }
+  const cdf = []; let a = 0; inten.forEach(v => { a += v / tot; cdf.push(a); });
+  const zc = []; a = 0; ZONES.forEach(z => { a += z.share; zc.push(a); });
+  const O = { n, w, t: new Float32Array(n), z: new Uint8Array(n), uS: new Float32Array(n), uX: new Float32Array(n), uF: new Float32Array(n), uP: new Float32Array(n), uC: new Float32Array(n), uN: new Float32Array(n), uR: new Float32Array(n) };
+  for (let i = 0; i < n; i++) { const u = r(); let lo = 0, hi = 167; while (lo < hi) { const m = (lo + hi) >> 1; if (cdf[m] < u) lo = m + 1; else hi = m; } O.t[i] = lo + r();
+    const uz = r(); let l2 = 0; while (l2 < 47 && zc[l2] < uz) l2++; O.z[i] = l2; O.uS[i] = r(); O.uX[i] = r(); O.uF[i] = r(); O.uP[i] = r(); O.uC[i] = r(); O.uN[i] = r(); O.uR[i] = r(); }
+  const ord = Array.from({ length: n }, (_, i) => i).sort((p, q) => O.t[p] - O.t[q]); O.ord = Int32Array.from(ord);
+  return O;
+}
+// static capacity scales (fixed at week-1 volume)
+const CAPSCALE = FCSHARE.map(s => s * V1 / 168 * HEAD);
+const ZCAP = ZONES.map(z => Math.ceil(z.share * V1 / 6 * z.kc * 1.2));
+const DEFLEV = { align: 0, rebalance: 0, truck: null, sunday: false, drivers: 0, alert: 0 };
+function capArr(fc, W, lev) { const a = lev.align, abs = W.abs; const c = new Float64Array(24 * 7 * 3 + 1); for (let h = 0; h < c.length - 1; h++) { const hh = h % 24; c[h + 1] = c[h] + CAPSCALE[fc] * ((1 - a) * LEGN[hh] + a * ALIGN[hh]) * (1 - abs); } return c; }
+function hourCap(fc, W, lev) { return Array.from({ length: 24 }, (_, h) => CAPSCALE[fc] * ((1 - lev.align) * LEGN[h] + lev.align * ALIGN[h]) * (1 - W.abs)); }
+function pickups(W, lev) { const t = lev.truck != null ? lev.truck : W.truck; const wd = lev.truck != null && lev.truck > W.truck + .01 ? [t] : [t]; return [wd, wd, wd, wd, wd, wd, lev.sunday ? [t] : []]; }
+function driverAdds(W, lev) { const add = new Array(48).fill(0), k = Math.round(lev.drivers); if (!k) return add; const load = ZONES.map((z, i) => z.share * W.vol / 6 * 1.12 / ZCAP[i]); const idx = ZONES.map((_, i) => i).sort((a, b) => load[b] - load[a]);
+  const eff = ZCAP.slice(); for (let j = 0; j < k; j++) { let bi = 0, bv = -1; for (let i = 0; i < 48; i++) { const v = ZONES[i].share * W.vol / 6 * 1.12 / eff[i]; if (v > bv) { bv = v; bi = i; } } eff[bi] += 34; add[bi] += 34; }
+  const quiet = idx.slice().reverse(); for (let j = 0; j < Math.min(k, 4); j++) add[quiet[j]] -= 10; return add; }
+function simulate(O, lev) {
+  lev = Object.assign({}, DEFLEV, lev); const W = world(O.w), n = O.n;
+  const R = { n, lev, W, D: new Float32Array(n), late: new Float32Array(n), st: [0, 1, 2, 3, 4, 5].map(() => new Float32Array(n)), prim: new Int8Array(n), fc: new Uint8Array(n), split: new Uint8Array(n), comp: new Uint8Array(n), ex: [0, 1, 2, 3, 4].map(() => new Float32Array(n)), pack: new Float32Array(n), rel: new Float32Array(n) };
+  const sched = pickups(W, lev), pf = W.ps.map(p => p * (1 - lev.rebalance));
+  const leaveFn = ready => { let d = Math.floor(ready / 24); for (let q = 0; q < 10; q++, d++) for (const tm of sched[d % 7]) { const c = d * 24 + tm; if (c >= ready) return c; } return ready + 24; };
+  const lists = [[], [], [], []], hold = new Float32Array(n);
+  for (let k = 0; k < n; k++) { const i = O.ord[k], z = ZONES[O.z[i]], h = z.home, sp = O.uS[i] < pf[h]; R.split[i] = sp ? 1 : 0; const f = sp ? BACKUP[h] : h; R.fc[i] = f; hold[i] = sp ? 3 + 9 * O.uX[i] : .1 + .3 * O.uX[i]; R.rel[i] = O.t[i] + hold[i]; lists[f].push(i); }
+  const Ts = new Float32Array(n);
+  for (let f = 0; f < 4; f++) { const L = lists[f].sort((a, b) => R.rel[a] - R.rel[b]), cum = capArr(f, W, lev); let N = 0, hp = 0;
+    const C = t => { const h = Math.floor(t); return cum[h] + (cum[h + 1] - cum[h]) * (t - h); };
+    for (const i of L) { const a = C(R.rel[i]), s = Math.max(a, N); N = s + 1; while (hp < cum.length - 2 && cum[hp + 1] <= s) hp++; let h = hp; if (cum[h] > s) { h = 0; while (cum[h + 1] <= s) h++; } const cp = cum[h + 1] - cum[h]; Ts[i] = h + (cp > 0 ? (s - cum[h]) / cp : 0); if (Ts[i] < R.rel[i]) Ts[i] = R.rel[i]; } }
+  const capZ = ZCAP.map((c, i) => c + driverAdds(W, lev)[i]); const adds = driverAdds(W, lev); for (let i = 0; i < 48; i++) capZ[i] = ZCAP[i] + adds[i];
+  const planned = new Int32Array(n), start0 = new Float32Array(n), leave = new Float32Array(n), Rr = new Float32Array(n), byZone = Array.from({ length: 48 }, () => []);
+  for (let i = 0; i < n; i++) { const pack = Ts[i] + .5; R.pack[i] = pack; const ready = pack + .25; let d = Math.floor(ready / 24), lv = -1; for (let q = 0; q < 10 && lv < 0; q++, d++) { for (const tm of sched[d % 7]) { const c = d * 24 + tm; if (c >= ready) { lv = c; break; } } }
+    leave[i] = lv; const z = O.z[i], tr = 1.2 + .9 * DZ[z][R.fc[i]]; const rr = lv + tr + 2.5; Rr[i] = rr; let pd = Math.ceil((rr - 7.5) / 24); while (pd % 7 === 6) pd++; planned[i] = pd; start0[i] = pd * 24 + 7.5; byZone[z].push(i); }
+  const Dd = R.D, D0 = new Float32Array(n);
+  for (let z = 0; z < 48; z++) { const L = byZone[z].sort((a, b) => Rr[a] - Rr[b]); let p = 0, q = [], cur = L.length ? planned[L[0]] : 0; const zn = ZONES[z];
+    while (p < L.length || q.length) { while (p < L.length && planned[L[p]] <= cur) q.push(L[p++]); if (!q.length) { cur = planned[L[p]]; continue; }
+      const cap = Math.max(1, Math.round(capZ[z] * (cur % 7 === 5 ? .9 : 1))), take = q.slice(0, cap); q = q.slice(cap); const cnt = Math.max(cap * .8, take.length);
+      take.forEach((i, k) => { let tm = cur * 24 + 9 + 10 * (k + O.uP[i]) / cnt + (zn.cls === 2 ? 1.5 * O.uP[i] : 0); D0[i] = tm; let D = tm; if (O.uF[i] < zn.pf) { let d2 = cur + 1; while (d2 % 7 === 6) d2++; D = d2 * 24 + 9 + 10 * O.uR[i]; } Dd[i] = D; });
+      if (q.length) { cur++; while (cur % 7 === 6) cur++; } else if (p < L.length) cur = Math.max(cur + 1, planned[L[p]]); else break; if (cur % 7 === 6) cur++; } }
+  let late = 0;
+  for (let i = 0; i < n; i++) { const t = O.t[i], dd0 = Math.floor(t / 24), hr0 = t - dd0 * 24, need = (dd0 % 7 === 6) ? 2 : (hr0 < 14 ? 1 : 2); let pd = dd0; for (let q = 0; q < need; q++) { pd++; while (pd % 7 === 6) pd++; } const P = pd * 24 + 21, L = Dd[i] - P; R.late[i] = L; const z = ZONES[O.z[i]], h = z.home;
+    R.st[0][i] = hold[i]; R.st[1][i] = Ts[i] - R.rel[i]; R.st[2][i] = .5; R.st[3][i] = leave[i] - R.pack[i]; R.st[4][i] = start0[i] - leave[i]; R.st[5][i] = Dd[i] - start0[i];
+    R.ex[0][i] = R.ex[1][i] = R.ex[2][i] = R.ex[3][i] = R.ex[4][i] = 0; R.prim[i] = -1;
+    if (L > 0) { const zi = O.z[i], f = R.fc[i], s0 = start0[i];
+      const sFrom = (lv, ff) => { const rr = lv + 1.2 + .9 * DZ[zi][ff] + 2.5; let pd = Math.ceil((rr - 7.5) / 24); while (pd % 7 === 6) pd++; return pd * 24 + 7.5; };
+      const red = [R.split[i] ? s0 - sFrom(leaveFn(R.pack[i] - (hold[i] - .3) + .25), h) : 0, s0 - sFrom(leaveFn(R.pack[i] - Math.max(0, R.st[1][i] - .5) + .25), f), s0 - sFrom(R.pack[i] + .25 + 1.5, f), Math.max(0, (D0[i] - start0[i]) - 12), Math.max(0, Dd[i] - D0[i])];
+      let pc2 = -1, bi = 0, bv = -1; for (let c = 0; c < 5; c++) { red[c] = Math.max(0, red[c]); R.ex[c][i] = red[c]; if (pc2 < 0 && L - red[c] <= 0) pc2 = c; if (red[c] > bv) { bv = red[c]; bi = c; } } R.prim[i] = pc2 >= 0 ? pc2 : (bv > 0 ? bi : 4); }
+    if (L > 0) { late++; let pc = .012 + .24 * (1 - Math.exp(-L / 30)); if (O.uN[i] < lev.alert) pc *= .5; R.comp[i] = O.uC[i] < pc ? 1 : 0; } else R.comp[i] = O.uC[i] < .006 ? 1 : 0; }
+  R.lateN = late; R.capZ = capZ; R.leave = leave; R.start0 = start0; R.planned = planned; R.D0 = D0; return R;
+}
+const onTime = (R, f = -1) => { let n = 0, l = 0; for (let i = 0; i < R.n; i++) if (f < 0 || R.fc[i] === f) { n++; if (R.late[i] > 0) l++; } return n ? 1 - l / n : 1; };
+/* ==== END SIM ==== */
+
+(function () {
+'use strict';
+/* ---------- tiny helpers ---------- */
+const $ = (s, r = document) => r.querySelector(s), $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent, text) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (text != null) e.textContent = text; if (parent) parent.appendChild(e); return e; }
+function h(tag, cls, text, parent) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; if (parent) parent.appendChild(e); return e; }
+const pct = (x, d = 1) => (x * 100).toFixed(d) + '%';
+const num = x => Math.round(x).toLocaleString('en-US');
+const f1 = x => x.toFixed(1);
+const pad = x => String(x).padStart(2, '0');
+const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const fmtT = x => { const d = Math.floor(x / 24), hh = Math.floor(x % 24), mm = Math.floor((x - Math.floor(x)) * 60); return DAYS[d % 7] + ' ' + pad(hh) + ':' + pad(mm) + (d >= 7 ? ' (next wk)' : ''); };
+const clampN = (x, a, b) => Math.max(a, Math.min(b, x));
+const CAUSE = [
+  { i: 1, k: 'staff', n: 'Staffing mismatch', s: 'Staffing', c: 'var(--c1)', lever: 'align' },
+  { i: 0, k: 'stock', n: 'Stock in the wrong place', s: 'Stock', c: 'var(--c2)', lever: 'rebalance' },
+  { i: 2, k: 'handoff', n: 'Carrier handoff cut-off', s: 'Handoff', c: 'var(--c3)', lever: 'truck' },
+  { i: 3, k: 'routes', n: 'Route overload', s: 'Routes', c: 'var(--c4)', lever: 'drivers' },
+  { i: 4, k: 'other', n: 'Other or combined', s: 'Other', c: 'var(--c5)' }];
+const byIdx = i => CAUSE.find(c => c.i === i);
+const S = { wk: 12, O: {}, R: {}, A: {}, ideal: {}, lev: { align: 0, rebalance: 0, truck: null, sunday: false, drivers: 0, alert: 0 }, metric: 'late', zone: null, tab: 0, tkCause: -1, tk: null, out: null, tbl: {}, hoverFc: -1, domOpen: -1 };
+const WEEKS = 12;
+
+/* ---------- tooltip ---------- */
+const tip = $('#tip');
+function showTip(ev, title, rows, note) {
+  tip.replaceChildren(); h('div', 'tt', title, tip);
+  rows.forEach(r => { const d = h('div', 'tr', null, tip); if (r.c) { const k = h('i', '', null, d); k.style.background = r.c; } h('b', '', r.v, d); h('span', '', r.l, d); });
+  if (note) h('div', 'tn', note, tip);
+  tip.style.display = 'block'; moveTip(ev);
+}
+function moveTip(ev) {
+  const r = tip.getBoundingClientRect(); let x = ev.clientX + 14, y = ev.clientY + 14;
+  if (x + r.width > innerWidth - 8) x = ev.clientX - r.width - 14; if (y + r.height > innerHeight - 8) y = ev.clientY - r.height - 14;
+  tip.style.left = Math.max(6, x) + 'px'; tip.style.top = Math.max(6, y) + 'px';
+}
+const hideTip = () => { tip.style.display = 'none'; };
+function bindTip(node, fn) {
+  node.addEventListener('pointermove', e => { fn(e); moveTip(e); });
+  node.addEventListener('pointerenter', e => fn(e));
+  node.addEventListener('pointerleave', hideTip);
+  node.addEventListener('focus', () => { const b = node.getBoundingClientRect(); fn({ clientX: b.left + b.width / 2, clientY: b.top }); });
+  node.addEventListener('blur', hideTip);
+}
+function legend(host, items, line) {
+  const d = h('div', 'lg' + (line ? ' line' : ''), null, host);
+  items.forEach(it => { const s = h('span', '', null, d); const i = h('i', '', null, s); i.style.background = it.c; s.append(it.n); });
+  return d;
+}
+function niceMax(v) { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return m * p; return 10 * p; }
+function gridY(svg, m, iw, ih, Y, max, ticks, fmt, min = 0) {
+  for (let k = 0; k <= ticks; k++) { const v = min + (max - min) * k / ticks, y = Y(v); el('line', { x1: m.l, x2: m.l + iw, y1: y, y2: y, stroke: 'var(--hair)', 'stroke-width': 1 }, svg); el('text', { x: m.l - 8, y: y + 4, 'text-anchor': 'end' }, svg, fmt(v)); }
+}
+
+/* ---------- generic line chart ---------- */
+function lineChart(host, w, o) {
+  const H = o.H || 250, m = { l: o.ml || 42, r: 18, t: 16, b: 30 }, iw = w - m.l - m.r, ih = H - m.t - m.b, n = o.x.length;
+  const svg = el('svg', { viewBox: `0 0 ${w} ${H}`, width: w, height: H, role: 'img', 'aria-label': o.label }, host);
+  const X = i => m.l + (n === 1 ? iw / 2 : i * iw / (n - 1)), Y = v => m.t + ih - (v - o.ymin) / (o.ymax - o.ymin) * ih;
+  gridY(svg, m, iw, ih, Y, o.ymax, o.ticks || 4, o.yfmt, o.ymin);
+  const every = o.every || 1; o.x.forEach((lb, i) => { if (i % every === 0) el('text', { x: X(i), y: H - 8, 'text-anchor': 'middle' }, svg, lb); });
+  if (o.sel != null) el('rect', { x: X(o.sel) - Math.min(18, iw / n / 2), y: m.t, width: Math.min(36, iw / n), height: ih, fill: 'var(--wash)', rx: 6 }, svg);
+  if (o.gap) { const a = o.series[0].vals, b = o.series[1].vals; let d = ''; for (let i = 0; i < n; i++) d += (i ? 'L' : 'M') + X(i) + ' ' + Y(Math.max(a[i], b[i])); for (let i = n - 1; i >= 0; i--) d += 'L' + X(i) + ' ' + Y(b[i]); el('path', { d: d + 'Z', fill: 'var(--crit)', opacity: .2 }, svg); }
+  o.series.forEach(s => {
+    const pts = s.vals.map((v, i) => v == null ? null : [X(i), Y(v)]); let d = '', pen = false;
+    pts.forEach(p => { if (!p) { pen = false; return; } d += (pen ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); pen = true; });
+    if (s.area) { const f = pts.filter(Boolean); el('path', { d: 'M' + f[0][0] + ' ' + Y(o.ymin) + 'L' + f.map(p => p.join(' ')).join('L') + 'L' + f[f.length - 1][0] + ' ' + Y(o.ymin) + 'Z', fill: s.color, opacity: .1 }, svg); }
+    el('path', { d, fill: 'none', stroke: s.color, 'stroke-width': s.w || 2, 'stroke-linejoin': 'round', 'stroke-linecap': 'round', opacity: s.op || 1 }, svg);
+    if (s.dots) pts.forEach((p, i) => { if (p) el('circle', { cx: p[0], cy: p[1], r: 4, fill: s.color, stroke: 'var(--card)', 'stroke-width': 2 }, svg); });
+    const lastI = s.vals.length - 1 - [...s.vals].reverse().findIndex(v => v != null); const lp = pts[lastI];
+    if (s.end && lp) { el('circle', { cx: lp[0], cy: lp[1], r: 5, fill: s.color, stroke: 'var(--card)', 'stroke-width': 2 }, svg); el('text', { x: lp[0] - 8, y: lp[1] - 12, 'text-anchor': 'end', style: 'font-weight:700;fill:var(--ink)' }, svg, s.end); }
+  });
+  if (o.marks) o.marks.forEach(mk => { el('circle', { cx: X(mk), cy: Y(o.ymin) - 0, r: 5.5, fill: 'var(--brand)', stroke: 'var(--card)', 'stroke-width': 2 }, svg); });
+  const cross = el('line', { x1: 0, x2: 0, y1: m.t, y2: m.t + ih, stroke: 'var(--ink3)', 'stroke-width': 1, opacity: 0 }, svg);
+  const dots = o.series.map(s => el('circle', { r: 5, fill: s.color, stroke: 'var(--card)', 'stroke-width': 2, opacity: 0 }, svg));
+  const ov = el('rect', { x: m.l - 10, y: m.t, width: iw + 20, height: ih, fill: 'transparent', style: o.onPick ? 'cursor:pointer' : '', tabindex: 0, 'aria-label': o.label + ', use arrow keys' }, svg);
+  const idxOf = e => { const b = svg.getBoundingClientRect(); const x = (e.clientX - b.left) * (w / b.width); return clampN(Math.round((x - m.l) / iw * (n - 1)), 0, n - 1); };
+  let cur = o.sel != null ? o.sel : 0;
+  const show = (e, i) => { cur = i; cross.setAttribute('x1', X(i)); cross.setAttribute('x2', X(i)); cross.setAttribute('opacity', 1);
+    dots.forEach((d, k) => { const v = o.series[k].vals[i]; if (v == null) d.setAttribute('opacity', 0); else { d.setAttribute('cx', X(i)); d.setAttribute('cy', Y(v)); d.setAttribute('opacity', 1); } });
+    const t = o.tip(i); showTip(e, t.title, t.rows, t.note); };
+  ov.addEventListener('pointermove', e => { show(e, idxOf(e)); moveTip(e); });
+  ov.addEventListener('pointerleave', () => { cross.setAttribute('opacity', 0); dots.forEach(d => d.setAttribute('opacity', 0)); hideTip(); });
+  if (o.onPick) ov.addEventListener('click', e => o.onPick(idxOf(e)));
+  ov.addEventListener('keydown', e => { if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') { e.preventDefault(); const i = clampN(cur + (e.key === 'ArrowRight' ? 1 : -1), 0, n - 1); const b = svg.getBoundingClientRect(); show({ clientX: b.left + X(i) * b.width / w, clientY: b.top + 30 }, i); } else if ((e.key === 'Enter' || e.key === ' ') && o.onPick) { e.preventDefault(); o.onPick(cur); } });
+  ov.addEventListener('blur', () => { cross.setAttribute('opacity', 0); dots.forEach(d => d.setAttribute('opacity', 0)); hideTip(); });
+}
+
+/* ---------- generic horizontal bars ---------- */
+function barsH(host, w, o) { // o.rows:[{label,vals:[{v,c,tip}]}]
+  const rowH = o.rowH || 44, m = { l: o.ml || 130, r: 62, t: 6, b: 24 }, H = m.t + m.b + o.rows.length * rowH, iw = w - m.l - m.r;
+  const svg = el('svg', { viewBox: `0 0 ${w} ${H}`, width: w, height: H, role: 'img', 'aria-label': o.label }, host);
+  const X = v => m.l + v / o.max * iw;
+  for (let k = 0; k <= (o.ticks || 4); k++) { const v = o.max * k / (o.ticks || 4), x = X(v); el('line', { x1: x, x2: x, y1: m.t, y2: H - m.b, stroke: 'var(--hair)' }, svg); el('text', { x, y: H - 6, 'text-anchor': 'middle' }, svg, o.xfmt(v)); }
+  if (o.ref != null) { el('line', { x1: X(o.ref), x2: X(o.ref), y1: m.t, y2: H - m.b, stroke: 'var(--ink)', 'stroke-width': 1.5 }, svg); el('text', { x: X(o.ref) + 4, y: m.t + 10, style: 'font-weight:700;fill:var(--ink)' }, svg, o.refLabel); }
+  o.rows.forEach((r, ri) => {
+    const y0 = m.t + ri * rowH, bh = Math.min(o.bh || 14, (rowH - 12) / r.vals.length);
+    el('text', { x: m.l - 10, y: y0 + rowH / 2 + 4, 'text-anchor': 'end', style: 'fill:var(--ink)' }, svg, r.label);
+    r.vals.forEach((b, bi) => {
+      const y = y0 + (rowH - bh * r.vals.length - 2 * (r.vals.length - 1)) / 2 + bi * (bh + 2), wd = Math.max(2, X(b.v) - m.l);
+      const g = el('g', { tabindex: 0, 'aria-label': b.aria || r.label + ' ' + b.txt }, svg);
+      el('rect', { x: m.l, y: y - 4, width: iw, height: bh + 8, fill: 'transparent' }, g);
+      const rc = el('path', { d: `M${m.l} ${y}H${m.l + wd - 4}Q${m.l + wd} ${y} ${m.l + wd} ${y + 4}V${y + bh - 4}Q${m.l + wd} ${y + bh} ${m.l + wd - 4} ${y + bh}H${m.l}Z`, fill: b.c }, g);
+      el('text', { x: m.l + wd + 6, y: y + bh / 2 + 4, style: 'font-weight:700;fill:var(--ink)' }, g, b.txt);
+      if (b.tip) bindTip(g, e => { rc.setAttribute('opacity', .8); showTip(e, b.tip.title, b.tip.rows, b.tip.note); }); g.addEventListener('pointerleave', () => rc.setAttribute('opacity', 1)); g.addEventListener('blur', () => rc.setAttribute('opacity', 1));
+      if (o.onClick) g.addEventListener('click', () => o.onClick(ri));
+    });
+  });
+}
+
+/* ---------- table view ---------- */
+function tableView(host, t) {
+  const sc = h('div', 'tblscroll', null, host), tb = h('table', 'dt', null, sc), th = h('tr', '', null, h('thead', '', null, tb));
+  t.head.forEach(x => h('th', '', x, th)); const body = h('tbody', '', null, tb);
+  t.rows.forEach(r => { const tr = h('tr', '', null, body); r.forEach(c => h('td', '', c, tr)); });
+}
+const CH = {};
+function reg(id, draw, table) { CH[id] = { draw, table }; }
+function drawChart(id) {
+  const host = $('#c-' + id); if (!host || !CH[id]) return; const w = Math.floor(host.clientWidth);
+  if (!w) return; host.replaceChildren(); hideTip();
+  if (S.tbl[id]) tableView(host, CH[id].table()); else CH[id].draw(host, w);
+}
+const drawAll = () => Object.keys(CH).forEach(drawChart);
+
+/* ---------- aggregation ---------- */
+function agg(O, R) {
+  const n = R.n, a = { n, w: O.w, late: 0, comp: 0, sumL: 0, prim: [0, 0, 0, 0, 0], st: [0, 0, 0, 0, 0, 0], hrN: new Float64Array(24), hrW: new Float64Array(24), pkN: new Float64Array(24), pkT: new Float64Array(24),
+    splitH: [0, 0, 0, 0], homeN: [0, 0, 0, 0], fcN: [0, 0, 0, 0], fcLate: [0, 0, 0, 0], fcW: [0, 0, 0, 0], zn: new Int32Array(48), zl: new Int32Array(48), zc: new Int32Array(48), zs: new Int32Array(48), zp: new Int32Array(240), truckLong: 0, miss: 0, holdSum: 0, nSplit: 0 };
+  for (let i = 0; i < n; i++) {
+    const z = O.z[i], home = ZONES[z].home, f = R.fc[i], L = R.late[i], hr = Math.floor(O.t[i]) % 24, ph = Math.floor(R.pack[i]) % 24;
+    a.zn[z]++; a.homeN[home]++; a.fcN[f]++; a.hrN[hr]++; a.hrW[hr] += R.st[1][i]; a.pkN[ph]++; a.pkT[ph] += R.st[3][i]; a.fcW[f] += R.st[1][i];
+    for (let s = 0; s < 6; s++) a.st[s] += R.st[s][i];
+    if (R.split[i]) { a.splitH[home]++; a.zs[z]++; a.nSplit++; a.holdSum += R.st[0][i]; }
+    if (R.st[3][i] > 8) a.truckLong++; if (Math.floor(R.leave[i] / 24) > Math.floor(R.pack[i] / 24)) a.miss++;
+    if (R.comp[i]) { a.comp++; a.zc[z]++; }
+    if (L > 0) { a.late++; a.sumL += L; a.prim[R.prim[i]]++; a.zl[z]++; a.fcLate[f]++; a.zp[z * 5 + R.prim[i]]++; }
+  }
+  a.st = a.st.map(v => v / n); a.ot = 1 - a.late / n; a.avgL = a.late ? a.sumL / a.late : 0; a.cpk = a.comp / n * 1000;
+  const capW = CAPSCALE.reduce((x, y) => x + y, 0) * 168 * (1 - R.W.abs); a.util = n / capW; a.abs = R.W.abs; a.truck = R.W.truck;
+  a.load = Array.from({ length: 48 }, (_, z) => a.zn[z] / (6 * R.capZ[z]));
+  a.split = a.nSplit / n; a.truckLongP = a.truckLong / n; a.missP = a.miss / n;
+  const pk = [11, 12, 13, 19, 20, 21]; let sw = 0, sn = 0; pk.forEach(x => { sw += a.hrW[x]; sn += a.hrN[x]; }); a.peakWait = sn ? sw / sn : 0;
+  let ow = 0, on = 0; for (let x = 0; x < 10; x++) { ow += a.hrW[x]; on += a.hrN[x]; } a.offWait = on ? ow / on : 0;
+  return a;
+}
+const A = () => S.A[S.wk], R = () => S.R[S.wk], O = () => S.O[S.wk];
+function idealGain(w) {
+  if (S.ideal[w]) return S.ideal[w]; const base = onTime(S.R[w]), Ow = S.O[w], g = {};
+  const sc = { staff: { align: 1 }, stock: { rebalance: .9 }, handoff: { truck: 18, sunday: true }, routes: { drivers: 8 } };
+  for (const k in sc) g[k] = (onTime(simulate(Ow, sc[k])) - base) * 100;
+  const Rc = simulate(Ow, { alert: 1 }); let c0 = 0, c1 = 0; for (let i = 0; i < Rc.n; i++) { c0 += S.R[w].comp[i]; c1 += Rc.comp[i]; } g.alertCut = c0 ? 1 - c1 / c0 : 0;
+  return (S.ideal[w] = g);
+}
+
+/* ---------- boot: compute the 12 base weeks ---------- */
+const bootDom = $$('#bootDom span');
+function boot() {
+  let w = 1; const bar = $('#bootBar'), t = $('#bootT');
+  (function step() {
+    if (w > WEEKS) { start(); return; }
+    t.textContent = `Replaying week ${w} of ${WEEKS}…`; bar.style.width = (w - 1) / WEEKS * 100 + '%'; bootDom.forEach((d, i) => d.classList.toggle('on', i <= Math.floor(w / 2)));
+    setTimeout(() => { const Ow = genWeek(w), Rw = simulate(Ow, {}); S.O[w] = Ow; S.R[w] = Rw; S.A[w] = agg(Ow, Rw); w++; step(); }, 20);
+  })();
+}
+
+/* ---------- 1 · hero ---------- */
+function renderFilters() {
+  const row = $('#wkrow'); if (!row.children.length) for (let w = 1; w <= WEEKS; w++) { const b = h('button', 'wk' + (EVENTS[w] ? ' wkev' : ''), String(w), row); b.type = 'button'; b.setAttribute('aria-label', 'Week ' + w + (EVENTS[w] ? ', event: ' + EVENTS[w] : '')); b.onclick = () => setWeek(w); }
+  $$('.wk', row).forEach((b, i) => b.setAttribute('aria-pressed', String(i + 1 === S.wk)));
+  const info = $('#wkinfo'); info.replaceChildren(); h('b', '', `Week ${S.wk} · from ${wkLabel(S.wk)}`, info); info.append(EVENTS[S.wk] ? ' · ' + EVENTS[S.wk] : ' · no major event');
+}
+function largestRemainder(vals, total) { const s = vals.reduce((a, b) => a + b, 0) || 1, raw = vals.map(v => v / s * total), fl = raw.map(Math.floor); let rest = total - fl.reduce((a, b) => a + b, 0); raw.map((r, i) => [r - fl[i], i]).sort((a, b) => b[0] - a[0]).forEach(([, i]) => { if (rest > 0) { fl[i]++; rest--; } }); return fl; }
+function renderHero() {
+  const a = A(), a1 = S.A[1], ot = a.ot, bad = ot < .9;
+  $('#heroNum').textContent = pct(ot);
+  $('#heroH').textContent = ot >= .93 ? 'Parcels are arriving on time.' : ot >= .85 ? 'Parcels are starting to slip.' : 'Parcels are arriving late.';
+  const st = $('#stamp'); st.textContent = ot >= .93 ? 'On track' : ot >= .85 ? 'Slipping' : 'Delayed'; st.className = 'stamp' + (ot >= .93 ? ' ok' : '');
+  const dl = $('#heroDelta'), d = (ot - a1.ot) * 100; dl.textContent = (d >= -0.05 ? '' : '▼ ') + (Math.abs(d) < .05 ? 'baseline week' : f1(Math.abs(d)) + ' pts vs week 1'); dl.style.background = Math.abs(d) < .05 ? 'var(--wash)' : ''; dl.style.color = Math.abs(d) < .05 ? 'var(--ink2)' : '';
+  const k = $('#kpis'); k.replaceChildren();
+  [['Complaints per 1,000', f1(a.cpk), `${f1(a1.cpk)} in week 1`], ['Late by (avg.)', f1(a.avgL) + ' h', `${f1(a1.avgL)} h in week 1`], ['Warehouse capacity used', pct(a.util, 0), `${pct(a1.util, 0)} in week 1`], ['Orders this week', num(a.n), `${num(a1.n)} in week 1`]].forEach(([l, v, s]) => { const x = h('div', 'kpi', null, k); h('small', '', l, x); h('b', '', v, x); h('em', '', s, x); });
+  $('#paradox').textContent = `Capacity is not the problem: warehouses run at ${pct(a.util, 0)} of capacity and late parcels average only ${f1(a.avgL)} hours. The network is short of the right capacity at the right place and time.`;
+  // waffle
+  const counts = CAUSE.map(c => a.prim[c.i]), late100 = Math.round(a.late / a.n * 100), parts = largestRemainder(counts, late100), wf = $('#waffle'); wf.replaceChildren();
+  const cells = []; for (let i = 0; i < 100 - late100; i++) cells.push(-1); parts.forEach((p, ci) => { for (let j = 0; j < p; j++) cells.push(ci); });
+  cells.forEach((ci, i) => { const b = h('button', ci < 0 ? '' : 'late', null, wf); b.type = 'button'; b.style.background = ci < 0 ? '' : CAUSE[ci].c; b.style.transitionDelay = (i * 6) + 'ms';
+    const nm = ci < 0 ? 'Delivered on time' : 'Late: ' + CAUSE[ci].n; b.setAttribute('aria-label', nm); b.setAttribute('role', 'listitem');
+    bindTip(b, e => showTip(e, nm, [{ v: ci < 0 ? 'On time' : 'Late', l: ci < 0 ? 'arrived within the promise' : 'click to open this cause', c: ci < 0 ? 'var(--ontime)' : CAUSE[ci].c }]));
+    if (ci >= 0) b.onclick = () => { setTab(ci); $('#s4').scrollIntoView({ behavior: 'smooth' }); }; });
+  $('#wafSub').textContent = `A random hundred orders from week ${S.wk}: ${100 - late100} on time, ${late100} late.`;
+  const lg = $('#wafLg'); lg.replaceChildren(); legend(lg, [{ n: 'On time', c: 'var(--ontime)' }].concat(CAUSE.map((c, i) => ({ n: c.s + ' ' + parts[i], c: c.c }))));
+  const top = CAUSE.map((c, i) => [c, parts[i]]).filter(x => x[0].k !== 'other').sort((x, y) => y[1] - x[1])[0];
+  $('#wafRead').textContent = late100 ? `Each late parcel is coloured by its main cause. Right now ${top[0].n.toLowerCase()} is the biggest single one.` : 'No late parcels in this sample.';
+}
+const DOMS = [
+  { n: 'Orders', ic: 'M4 7l8-4 8 4v10l-8 4-8-4zM4 7l8 4 8-4M12 11v10', f: a => `${pct(a.hrN[11] / a.n * 24 > 0 ? (a.hrN[12] + a.hrN[20] + a.hrN[21]) / a.n : 0, 0)} of orders land in just three evening and lunchtime hours (12:00, 20:00, 21:00), and week ${a.w} brought ${num(a.n)} orders.` },
+  { n: 'Warehouses', ic: 'M3 21V9l9-5 9 5v12M8 21v-7h8v7', f: a => `Warehouses use ${pct(a.util, 0)} of capacity on average, yet orders placed at peak hours wait ${f1(a.peakWait)} h to be picked against ${f1(a.offWait)} h in the morning.` },
+  { n: 'Routes', ic: 'M6 19a2 2 0 100-4 2 2 0 000 4zM18 9a2 2 0 100-4 2 2 0 000 4zM8 17h6a3 3 0 000-6h-4a3 3 0 010-6h6', f: a => `${a.load.filter(x => x > 1).length} of 48 delivery zones carry more stops per day than their drivers can serve; the extra stops roll over to the next day.` },
+  { n: 'Staffing', ic: 'M9 11a3 3 0 100-6 3 3 0 000 6zM3 20c0-3 3-5 6-5s6 2 6 5M17 11a2.5 2.5 0 100-5M17 15c2.5 0 4 1.7 4 4', f: a => `${pct(a.abs, 1)} of pickers are absent this week (3.0% in week 1) and the shift pattern does not follow the demand curve.` },
+  { n: 'Inventory', ic: 'M3 8h8v8H3zM13 8h8v8h-8zM8 16v4h8v-4', f: a => `${pct(a.split, 1)} of orders are split across warehouses because stock is not where customers are, adding ${f1(a.holdSum / Math.max(1, a.nSplit))} h of hold on each.` },
+  { n: 'Delivery', ic: 'M2 6h12v10H2zM14 10h4l3 3v3h-7M6 19a2 2 0 100-4 2 2 0 000 4zM17 19a2 2 0 100-4 2 2 0 000 4z', f: a => `${pct(a.missP, 0)} of parcels miss the same-day carrier truck (${pct(S.A[1].missP, 0)} in week 1); the last pickup is at ${pad(a.truck)}:00 and Sundays have no pickup.` }];
+function renderDomains() {
+  const box = $('#dom'); box.replaceChildren(); let tot = 0; for (let w = 1; w <= WEEKS; w++) tot += S.A[w].n;
+  DOMS.forEach((d, i) => { const b = h('button', '', null, box); b.type = 'button'; b.setAttribute('aria-expanded', String(S.domOpen === i));
+    const s = el('svg', { viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', 'stroke-width': 1.9, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, b); el('path', { d: d.ic }, s);
+    h('b', '', d.n, b); h('small', '', ['order records', 'pick tasks', 'route stops', 'site-weeks of rosters', 'stock checks', 'delivery scans'][i], b); h('strong', '', i === 3 ? '48' : num(tot), b);
+    b.onclick = () => { S.domOpen = S.domOpen === i ? -1 : i; renderDomains(); }; });
+  const nt = $('#domnote'); nt.replaceChildren();
+  if (S.domOpen < 0) nt.textContent = 'Select a data domain to see what the AI learned from it, for the week selected above.'; else { const b = h('b', '', DOMS[S.domOpen].n + ': ', nt); nt.append(DOMS[S.domOpen].f(A())); }
+}
+
+/* ---------- 2 · trend, causes by week, stages, tracker ---------- */
+function setWeek(w) { S.wk = w; S.tk = null; S.zone = null; renderAll(true); }
+const ontimes = () => Array.from({ length: WEEKS }, (_, i) => S.A[i + 1].ot * 100);
+reg('trend', (host, w) => {
+  const ot = ontimes(), cp = Array.from({ length: WEEKS }, (_, i) => S.A[i + 1].cpk);
+  legend(host, [{ n: 'On-time %', c: 'var(--c1)' }, { n: 'Complaints per 1,000 orders', c: 'var(--c2)' }], true);
+  const wrap = h('div', '', null, host);
+  lineChart(wrap, w, { x: ot.map((_, i) => 'W' + (i + 1)), every: 1, series: [{ name: 'On-time %', color: 'var(--c1)', vals: ot, area: true, end: f1(ot[WEEKS - 1]) + '%' }], ymin: 60, ymax: 100, ticks: 4, yfmt: v => v + '%', H: 210, sel: S.wk - 1, marks: Object.keys(EVENTS).map(k => +k - 1), label: 'On-time percentage by week',
+    onPick: i => setWeek(i + 1), tip: i => ({ title: `Week ${i + 1} · ${wkLabel(i + 1)}`, rows: [{ c: 'var(--c1)', v: f1(ot[i]) + '%', l: 'on time' }, { c: 'var(--c2)', v: f1(cp[i]), l: 'complaints per 1,000' }], note: EVENTS[i + 1] ? 'Event: ' + EVENTS[i + 1] : 'Click to select this week' }) });
+  lineChart(wrap, w, { x: ot.map((_, i) => 'W' + (i + 1)), series: [{ name: 'Complaints', color: 'var(--c2)', vals: cp, area: true, end: f1(cp[WEEKS - 1]) }], ymin: 0, ymax: niceMax(Math.max(...cp) * 1.05), ticks: 3, yfmt: v => String(Math.round(v)), H: 150, sel: S.wk - 1, label: 'Complaints per 1,000 orders by week', onPick: i => setWeek(i + 1),
+    tip: i => ({ title: `Week ${i + 1} · ${wkLabel(i + 1)}`, rows: [{ c: 'var(--c1)', v: f1(ot[i]) + '%', l: 'on time' }, { c: 'var(--c2)', v: f1(cp[i]), l: 'complaints per 1,000' }], note: 'Click to select this week' }) });
+}, () => ({ head: ['Week', 'Starts', 'On time %', 'Complaints /1,000', 'Event'], rows: Array.from({ length: WEEKS }, (_, i) => [i + 1, wkLabel(i + 1), f1(S.A[i + 1].ot * 100), f1(S.A[i + 1].cpk), EVENTS[i + 1] || '']) }));
+reg('stack', (host, w) => {
+  legend(host, CAUSE.map(c => ({ n: c.s, c: c.c })));
+  const H = 400, m = { l: 44, r: 10, t: 12, b: 30 }, iw = w - m.l - m.r, ih = H - m.t - m.b, tot = Array.from({ length: WEEKS }, (_, i) => S.A[i + 1].late), max = niceMax(Math.max(...tot) * 1.03);
+  const svg = el('svg', { viewBox: `0 0 ${w} ${H}`, width: w, height: H, role: 'img', 'aria-label': 'Late orders per week by cause' }, host), Y = v => m.t + ih - v / max * ih;
+  gridY(svg, m, iw, ih, Y, max, 4, v => num(v));
+  const slot = iw / WEEKS, bw = Math.min(24, slot - 6);
+  for (let k = 0; k < WEEKS; k++) {
+    const a = S.A[k + 1], cx = m.l + slot * k + slot / 2; if (k + 1 === S.wk) el('rect', { x: cx - slot / 2 + 1, y: m.t, width: slot - 2, height: ih, fill: 'var(--wash)', rx: 6 }, svg);
+    if (w >= 520 || k % 2 === 0) el('text', { x: cx, y: H - 8, 'text-anchor': 'middle' }, svg, 'W' + (k + 1)); let acc = 0;
+    CAUSE.slice().reverse().forEach(c => { const v = a.prim[c.i]; if (!v) return; const y1 = Y(acc), y2 = Y(acc + v); acc += v; const hh = Math.max(1, y1 - y2 - 2);
+      const r = el('rect', { x: cx - bw / 2, y: y2, width: bw, height: hh, fill: c.c, tabindex: 0, 'aria-label': `Week ${k + 1} ${c.n}: ${v} late orders`, style: 'cursor:pointer', rx: 2 }, svg);
+      bindTip(r, e => { r.setAttribute('opacity', .8); showTip(e, `Week ${k + 1} · ${c.n}`, [{ c: c.c, v: num(v), l: `late orders (${pct(v / a.late, 0)} of ${num(a.late)})` }], 'Click to select this week'); }); r.addEventListener('pointerleave', () => r.setAttribute('opacity', 1)); r.onclick = () => setWeek(k + 1); });
+  }
+}, () => ({ head: ['Week', 'Late orders'].concat(CAUSE.map(c => c.s)), rows: Array.from({ length: WEEKS }, (_, i) => [i + 1, S.A[i + 1].late].concat(CAUSE.map(c => S.A[i + 1].prim[c.i]))) }));
+const STG = ['Stock check hold', 'Pick queue', 'Pick and pack', 'Truck wait', 'Line-haul and sort', 'Route and last mile'];
+reg('stage', (host, w) => {
+  const a = A(), a1 = S.A[1], max = niceMax(Math.max(...a.st, ...a1.st) * 1.15);
+  legend(host, [{ n: 'Week 1', c: 'var(--c5)' }, { n: 'Week ' + S.wk, c: 'var(--c1)' }]);
+  const narrow = w < 420, SN = narrow ? ['Stock hold', 'Pick queue', 'Pick and pack', 'Truck wait', 'Line-haul', 'Last mile'] : STG;
+  barsH(host, w, { ml: narrow ? 92 : 148, max, ticks: narrow ? 2 : 4, xfmt: v => v + ' h', label: 'Average hours per order by stage', rowH: 50, bh: 12, rows: STG.map((nm, i) => ({ label: SN[i], vals: [{ v: a1.st[i], c: 'var(--c5)', txt: f1(a1.st[i]) + ' h', tip: { title: nm, rows: [{ c: 'var(--c5)', v: f1(a1.st[i]) + ' h', l: 'week 1' }, { c: 'var(--c1)', v: f1(a.st[i]) + ' h', l: 'week ' + S.wk }], note: (a.st[i] - a1.st[i] >= 0 ? '+' : '') + f1(a.st[i] - a1.st[i]) + ' h vs week 1' } }, { v: a.st[i], c: 'var(--c1)', txt: f1(a.st[i]) + ' h', tip: { title: nm, rows: [{ c: 'var(--c5)', v: f1(a1.st[i]) + ' h', l: 'week 1' }, { c: 'var(--c1)', v: f1(a.st[i]) + ' h', l: 'week ' + S.wk }], note: (a.st[i] - a1.st[i] >= 0 ? '+' : '') + f1(a.st[i] - a1.st[i]) + ' h vs week 1' } }] })) });
+}, () => ({ head: ['Stage', 'Week 1 (h)', 'Week ' + S.wk + ' (h)', 'Change (h)'], rows: STG.map((n, i) => [n, f1(S.A[1].st[i]), f1(A().st[i]), f1(A().st[i] - S.A[1].st[i])]) }));
+function tkPick(rand) {
+  const Rw = R(), n = Rw.n, c = [];
+  for (let i = 0; i < n; i++) if (Rw.late[i] > 6 && (S.tkCause < 0 || Rw.prim[i] === S.tkCause)) c.push(i);
+  if (!c.length) return -1; return c[rand ? Math.floor(Math.random() * c.length) : Math.floor(c.length * .37)];
+}
+function promiseOf(t) { const d0 = Math.floor(t / 24), hr = t - d0 * 24, need = d0 % 7 === 6 ? 2 : hr < 14 ? 1 : 2; let pd = d0; for (let q = 0; q < need; q++) { pd++; while (pd % 7 === 6) pd++; } return pd * 24 + 21; }
+function renderTracker() {
+  const top = $('#tkTop'); top.replaceChildren();
+  [['All causes', -1]].concat(CAUSE.slice(0, 4).map(c => [c.s, c.i])).forEach(([nm, ci]) => { const b = h('button', 'chip', nm, top); b.type = 'button'; b.setAttribute('aria-pressed', String(S.tkCause === ci)); b.onclick = () => { S.tkCause = ci; S.tk = tkPick(false); renderTracker(); }; });
+  const go = h('button', 'chip go', 'Another late order ↻', top); go.type = 'button'; go.onclick = () => { S.tk = tkPick(true); renderTracker(); };
+  if (S.tk == null) S.tk = tkPick(false);
+  const tl = $('#tl'), vd = $('#verdict'); tl.replaceChildren(); vd.replaceChildren();
+  if (S.tk < 0) { h('p', '', 'No late orders of this kind in the selected week.', tl); return; }
+  const i = S.tk, Rw = R(), Ow = O(), z = ZONES[Ow.z[i]], t = Ow.t[i], P = promiseOf(t), hold = Rw.st[0][i], rel = t + hold, f = Rw.fc[i], home = z.home;
+  const evs = [
+    { t, b: 'Order placed', s: `Delivery zone ${z.name} (${['urban', 'suburban', 'rural'][z.cls]}). Promised by ${fmtT(P)}.` },
+    { t: rel, b: Rw.split[i] ? 'Stock missing at home warehouse' : 'Assigned to ' + FCN[f], s: Rw.split[i] ? `${FCN[home]} was out of an item, so the order moved to ${FCN[f]} after a ${f1(hold)} h hold.` : `${FCN[f]} had everything in stock.`, d: hold, slow: Rw.split[i] === 1 },
+    { t: Rw.pack[i], b: 'Picked and packed', s: `Waited ${f1(Rw.st[1][i])} h in the pick queue.`, d: Rw.st[1][i] + .5, slow: Rw.st[1][i] > 3 },
+    { t: Rw.leave[i], b: 'Left on the carrier truck', s: `Packed ${fmtT(Rw.pack[i])}; the truck leaves at ${pad(Rw.W.truck)}:00${Rw.leave[i] - Rw.pack[i] > 8 ? ', so the parcel waited for the next one' : ''}.`, d: Rw.st[3][i], slow: Rw.st[3][i] > 6 },
+    { t: Rw.start0[i], b: 'Arrived at the delivery depot', s: `Line-haul and sorting took ${f1(Rw.st[4][i])} h in total.`, d: Rw.st[4][i], slow: false },
+    { t: Rw.D[i], b: 'Delivered', s: Rw.D[i] - Rw.D0[i] > 1 ? 'Driver capacity ran out, so the stop rolled to the next delivery day and the first attempt failed or was bumped.' : 'Delivered on the planned route.', d: Rw.st[5][i], slow: Rw.D[i] - Rw.D0[i] > 1, fin: true }];
+  evs.forEach(e => { const d = h('div', 'ev' + (e.slow ? ' slow' : '') + (e.fin ? ' fin' : ''), null, tl); h('b', '', e.b, d); h('time', '', fmtT(e.t), d); h('span', '', e.s, d); if (e.d != null && e.d > 0.05) h('u', '', '+' + f1(e.d) + ' h', d); });
+  const c = byIdx(Rw.prim[i]); h('h4', '', `${f1(Rw.late[i])} hours late. Main cause: ${c.n}.`, vd);
+  h('p', 'sub', 'Hours this order would have saved if each problem alone were fixed:', vd);
+  const mx = Math.max(1, ...CAUSE.map(cc => Rw.ex[cc.i][i]));
+  CAUSE.forEach(cc => { const v = Rw.ex[cc.i][i], r = h('div', 'exrow', null, vd); h('span', '', cc.s, r); const tr = h('div', '', null, r); const bi = h('i', '', null, tr); bi.style.width = (v / mx * 100) + '%'; bi.style.background = cc.c; h('b', '', f1(v) + ' h', r); });
+}
+
+function renderMovers() {
+  const a = A(), a1 = S.A[1], b = $('#movers'); b.replaceChildren();
+  STG.map((n, i) => [n, a.st[i] - a1.st[i]]).sort((x, y) => y[1] - x[1]).slice(0, 3).forEach(([n, d]) => { const r = h('div', 'mv', null, b); h('span', '', n, r); h('b', '', (d >= 0 ? '+' : '') + f1(d) + ' h per order', r); });
+  const t = $('#r-stage'); t.replaceChildren(); const top = STG.map((n, i) => [n, a.st[i] - a1.st[i]]).sort((x, y) => y[1] - x[1])[0]; t.append('The biggest increase is '); h('b', '', top[0].toLowerCase(), t); t.append(` (${top[1] >= 0 ? '+' : ''}${f1(top[1])} h per order versus week 1).`);
+  const rk = $('#heroRank'); rk.replaceChildren(); h('h4', '', 'AI diagnosis: on-time points each fix would win back', rk); const g = idealGain(S.wk), mx = Math.max(1, g.staff, g.stock, g.handoff, g.routes);
+  CAUSE.slice(0, 4).map(c => [c, g[c.k]]).sort((x, y) => y[1] - x[1]).forEach(([c, v]) => { const r = h('div', 'rk', null, rk); h('span', '', c.s, r); const t2 = h('div', '', null, r), i = h('i', '', null, t2); i.style.width = Math.max(2, v / mx * 100) + '%'; i.style.background = c.c; h('b', '', '+' + f1(v), r); });
+}
+/* ---------- 3 · map ---------- */
+const METRICS = {
+  late: { n: 'Late orders', f: a => Array.from(a.zl, (v, z) => a.zn[z] ? v / a.zn[z] : 0), fmt: v => pct(v, 0), step: .05 },
+  comp: { n: 'Complaints per 1,000', f: a => Array.from(a.zc, (v, z) => a.zn[z] ? v / a.zn[z] * 1000 : 0), fmt: v => f1(v), step: 5 },
+  load: { n: 'Driver load', f: a => a.load, fmt: v => pct(v, 0), step: .1 },
+  split: { n: 'Split orders', f: a => Array.from(a.zs, (v, z) => a.zn[z] ? v / a.zn[z] : 0), fmt: v => pct(v, 0), step: .02 } };
+function hexPath(x, y, r) { let d = ''; for (let k = 0; k < 6; k++) { const an = (60 * k - 90) * Math.PI / 180; d += (k ? 'L' : 'M') + (x + r * Math.cos(an)).toFixed(1) + ' ' + (y + r * Math.sin(an)).toFixed(1); } return d + 'Z'; }
+function mainCause(a, z) { let b = -1, bv = 0; for (let c = 0; c < 5; c++) { const v = a.zp[z * 5 + c]; if (v > bv) { bv = v; b = c; } } return b; }
+reg('map', (host, w) => {
+  const a = A(), M = METRICS[S.metric], vals = M.f(a), mx = Math.max(M.step, Math.ceil(Math.max(...vals) / M.step) * M.step);
+  $('#rampLo').textContent = M.fmt(0); $('#rampHi').textContent = M.fmt(mx);
+  const W0 = 8 * HW, H0 = 7 * 1.5 * HS + 2 * HS, svg = el('svg', { viewBox: `-4 -4 ${W0 + 8} ${H0 + 8}`, class: 'hexsvg', role: 'img', 'aria-label': 'Hexagon map of 48 delivery zones coloured by ' + M.n }, host);
+  const gs = ZONES.map(z => { const k = clampN(Math.floor(vals[z.id] / mx * 7), 0, 6); const g = el('g', { class: 'zg', 'data-home': z.home, opacity: S.hoverFc >= 0 && z.home !== S.hoverFc ? .3 : 1 }, svg);
+    const p = el('path', { class: 'hex', d: hexPath(z.x, z.y, HS - 2.5), fill: `var(--r${k + 1})`, stroke: 'var(--card)', 'stroke-width': 2, tabindex: 0, role: 'button', 'aria-label': `${z.name}, ${M.n} ${M.fmt(vals[z.id])}` }, g);
+    bindTip(p, e => showTip(e, z.name, [{ c: 'var(--c1)', v: M.fmt(vals[z.id]), l: M.n.toLowerCase() }, { v: FCN[z.home], l: 'home warehouse' }, { v: ['Urban', 'Suburban', 'Rural'][z.cls], l: 'zone type' }], 'Click for details'));
+    p.addEventListener('click', () => { S.zone = z.id; renderZone(); drawChart('map'); }); p.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); S.zone = z.id; renderZone(); drawChart('map'); } });
+    return g; });
+  if (S.zone != null) { const z = ZONES[S.zone]; const g = gs[S.zone]; svg.appendChild(g); const sel = el('path', { d: hexPath(z.x, z.y, HS - 2.5), fill: 'none', stroke: 'var(--ink)', 'stroke-width': 4, 'pointer-events': 'none' }, g); }
+  FCZ.forEach((z, i) => { const g = el('g', { 'pointer-events': 'none' }, svg); el('circle', { cx: z.x, cy: z.y, r: 13, fill: 'var(--card)', stroke: 'var(--ink)', 'stroke-width': 2.5 }, g); el('text', { x: z.x, y: z.y + 4.5, 'text-anchor': 'middle', style: 'font:800 13px var(--f-d);fill:var(--ink)' }, g, FCN[i][0]); });
+}, () => { const a = A(), M = METRICS[S.metric], v = M.f(a); return { head: ['Zone', 'Warehouse', 'Type', M.n], rows: ZONES.map(z => [z.name, FCN[z.home], ['Urban', 'Suburban', 'Rural'][z.cls], M.fmt(v[z.id])]) }; });
+function renderMapTabs() {
+  const t = $('#mapTabs'); t.replaceChildren();
+  Object.keys(METRICS).forEach(k => { const b = h('button', 'chip', METRICS[k].n, t); b.type = 'button'; b.setAttribute('aria-pressed', String(S.metric === k)); b.onclick = () => { S.metric = k; renderMapTabs(); drawChart('map'); }; });
+  $('#mapSub').textContent = `Week ${S.wk} · colour shows ${METRICS[S.metric].n.toLowerCase()} per zone`;
+}
+function meter(parent, label, val, txt, max, color) { const m = h('div', 'meter', null, parent), t = h('div', 't', null, m); h('span', '', label, t); h('b', '', txt, t); const bar = h('div', 'm', null, m), i = h('i', '', null, bar); i.style.width = clampN(val / max * 100, 2, 100) + '%'; if (color) i.style.background = color; }
+function renderZone() {
+  const p = $('#zpanel'); p.replaceChildren(); const a = A();
+  if (S.zone == null) { let bi = 0, bv = -1; for (let z = 0; z < 48; z++) { const v = a.zn[z] ? a.zl[z] / a.zn[z] : 0; if (v > bv) { bv = v; bi = z; } } S.zone = bi; }
+  const wl = $('#worst'); wl.replaceChildren(); Array.from({ length: 48 }, (_, z) => [a.zn[z] ? a.zl[z] / a.zn[z] : 0, z]).sort((x, y) => y[0] - x[0]).slice(0, 5).forEach(([v, z]) => { const r = h('button', 'wz', null, wl); r.type = 'button'; h('span', '', ZONES[z].name + ' · ' + FCN[ZONES[z].home], r); const mc = mainCause(a, z); const tg = h('span', 'tag', mc >= 0 ? byIdx(mc).s : '–', r); h('b', '', pct(v, 0), r); r.onclick = () => { S.zone = z; renderZone(); drawChart('map'); }; });
+  if (S.zone == null) { h('h3', '', 'Pick a zone', p); h('p', 'sub', 'Click any hexagon to see its orders, driver load and the AI’s verdict. The circled hexagons are the four warehouses.', p); return; }
+  const z = ZONES[S.zone], n = a.zn[z.id], late = n ? a.zl[z.id] / n : 0, mc = mainCause(a, z.id), load = a.load[z.id], sp = n ? a.zs[z.id] / n : 0;
+  h('h3', '', z.name, p); const tg = h('div', 'tags', null, p); [['Urban', 'Suburban', 'Rural'][z.cls], 'Served from ' + FCN[z.home], num(n) + ' orders'].forEach(x => h('span', 'tag', x, tg));
+  meter(p, 'Late orders', late, pct(late, 0), .6, 'var(--c2)'); meter(p, 'Driver load (100% = full)', load, pct(load, 0), 1.4, load > 1 ? 'var(--c4)' : 'var(--c1)'); meter(p, 'Orders split across warehouses', sp, pct(sp, 0), .3, 'var(--c2)');
+  const v = h('p', 'read', null, p); h('b', '', 'AI verdict: ', v);
+  v.append(load > 1.05 ? `Drivers are over capacity here (${pct(load, 0)} load), so stops roll to the next day.` : mc >= 0 && late > .08 ? `Most late orders here trace back to ${byIdx(mc).n.toLowerCase()}.` : 'This zone is healthy: late orders are close to the network baseline.');
+}
+function renderFcs() {
+  const b = $('#fcs'), a = A(); b.replaceChildren();
+  FCN.forEach((nm, i) => { const c = h('div', 'fc', null, b); c.tabIndex = 0; const t = h('h4', '', null, c); h('i', '', nm[0], t); t.append(nm);
+    const dl = h('dl', '', null, c); [['On time', pct(1 - a.fcLate[i] / a.fcN[i], 0)], ['Split rate', pct(a.splitH[i] / a.homeN[i], 1)], ['Avg pick wait', f1(a.fcW[i] / a.fcN[i]) + ' h'], ['Orders', num(a.fcN[i])]].forEach(([k, v]) => { h('dt', '', k, dl); h('dd', '', v, dl); });
+    const on = () => { S.hoverFc = i; drawChart('map'); }, off = () => { S.hoverFc = -1; drawChart('map'); };
+    c.addEventListener('pointerenter', on); c.addEventListener('pointerleave', off); c.addEventListener('focus', on); c.addEventListener('blur', off); });
+}
+
+/* ---------- 4 · causes ---------- */
+function renderTabs() {
+  const box = $('#tabs'), g = idealGain(S.wk); box.replaceChildren();
+  const gains = { staff: g.staff, stock: g.stock, handoff: g.handoff, routes: g.routes };
+  CAUSE.slice(0, 4).forEach((c, i) => { const b = h('button', 'tab', null, box); b.type = 'button'; b.setAttribute('role', 'tab'); b.setAttribute('aria-selected', String(S.tab === i)); b.style.setProperty('--tc', c.c);
+    h('small', '', 'Cause ' + (i + 1), b); h('b', '', c.n, b); h('strong', '', '+' + f1(gains[c.k]) + ' pts', b); h('em', '', `${num(A().prim[c.i])} late orders blamed (${pct(A().prim[c.i] / Math.max(1, A().late), 0)})`, b); b.onclick = () => setTab(i); });
+}
+function setTab(i) { S.tab = i; renderTabs(); renderEvid(); }
+const TXT = {
+  staff: a => ({ t: 'Pickers are on the wrong shifts', s: 'Average orders per hour vs picking capacity, 24 hours', why: `<b>Why:</b> the roster was built for an older demand curve. Capacity bunches up in the morning while orders peak at lunch and in the evening, so peak-hour orders wait <b>${f1(a.peakWait)} h</b> to be picked against ${f1(a.offWait)} h in the morning. Red shading marks where orders outrun capacity.`,
+    facts: [[f1(a.peakWait) + ' h', 'average pick wait for orders placed at 11 to 14 and 19 to 22'], [f1(a.offWait) + ' h', 'average pick wait for orders placed before 10:00'], [pct(a.abs, 1), 'of pickers absent this week, up from 3.0% in week 1']] }),
+  stock: a => ({ t: 'Stock is not where customers are', s: 'Share of orders split across two warehouses, by week', why: `<b>Why:</b> when the home warehouse lacks an item the order is held, picked at a backup warehouse and shipped further. The split rate has climbed from ${pct(S.A[1].split, 1)} to <b>${pct(a.split, 1)}</b>, with a jump in week 9 when 1,800 new products spread stock thinner.`,
+    facts: [[pct(a.split, 1), 'of this week’s orders were split'], [f1(a.holdSum / Math.max(1, a.nSplit)) + ' h', 'average hold before a split order is released'], [FCN[a.splitH.map((v, i) => v / a.homeN[i]).reduce((b, v, i, r) => v > r[b] ? i : b, 0)], 'has the worst split rate']] }),
+  handoff: a => ({ t: 'Parcels miss the carrier’s last truck', s: 'Average hours a parcel waits for the truck, by the hour it was packed', why: `<b>Why:</b> the last pickup is at <b>${pad(a.truck)}:00</b> and there is no Sunday collection. Anything packed just after the truck leaves waits a full day, and evening peak orders are packed after the cut-off almost every day.`,
+    facts: [[pct(a.missP, 0), 'of parcels miss the same-day truck (week 1: ' + pct(S.A[1].missP, 0) + ')'], [f1(a.st[3]) + ' h', 'average truck wait (week 1: ' + f1(S.A[1].st[3]) + ' h)'], [pad(a.truck) + ':00', 'last pickup' + (a.truck !== S.A[1].truck ? ' (was ' + pad(S.A[1].truck) + ':00)' : '')]] }),
+  routes: a => { const top = a.load.map((v, z) => [v, z]).sort((x, y) => y[0] - x[0]); return { t: 'Drivers run out of stops per day', s: 'Busiest 12 zones: stops needed vs driver capacity (100% = full)', why: `<b>Why:</b> driver capacity was sized for week-1 volume. Orders have grown ${pct(a.n / S.A[1].n - 1, 0)} and rural stops take longer, so <b>${a.load.filter(x => x > 1).length} of 48 zones</b> now need more stops per day than their drivers can make. The overflow rolls to the next day.`,
+    facts: [[a.load.filter(x => x > 1).length + ' / 48', 'zones above 100% driver load'], [ZONES[top[0][1]].name, 'busiest zone at ' + pct(top[0][0], 0) + ' load'], [f1(a.st[5]) + ' h', 'average last-mile stage (week 1: ' + f1(S.A[1].st[5]) + ' h)']] }; } };
+function renderEvid() {
+  const a = A(), c = CAUSE[S.tab], x = TXT[c.k](a);
+  $('#evT').textContent = x.t; $('#evS').textContent = x.s; $('#evWhy').innerHTML = x.why;
+  const f = $('#facts'); f.replaceChildren(); x.facts.forEach(([v, l]) => { const d = h('div', 'fact', null, f); d.style.borderLeft = '6px solid ' + c.c; h('b', '', v, d); h('span', '', l, d); });
+  drawChart('evid');
+}
+const hrs = Array.from({ length: 24 }, (_, i) => pad(i));
+reg('evid', (host, w) => {
+  const a = A(), c = CAUSE[S.tab];
+  if (c.k === 'staff') {
+    const dem = Array.from({ length: 24 }, (_, i) => a.hrN[i] / 7), cap = Array.from({ length: 24 }, (_, i) => FCN.reduce((s, _n, f) => s + hourCap(f, R().W, { align: 0 })[i], 0)), mx = niceMax(Math.max(...dem, ...cap) * 1.08);
+    legend(host, [{ n: 'Orders arriving per hour', c: 'var(--c5)' }, { n: 'Picking capacity per hour', c: 'var(--c1)' }, { n: 'Orders outrun capacity', c: 'var(--crit)' }], true);
+    lineChart(host, w, { x: hrs, every: w < 520 ? 3 : 2, ymin: 0, ymax: mx, yfmt: v => String(Math.round(v)), H: 280, gap: true, label: 'Orders and picking capacity by hour', series: [{ name: 'Orders', color: 'var(--c5)', vals: dem, area: true }, { name: 'Capacity', color: 'var(--c1)', vals: cap }],
+      tip: i => ({ title: `${pad(i)}:00 to ${pad(i + 1)}:00`, rows: [{ c: 'var(--c5)', v: f1(dem[i]), l: 'orders per hour' }, { c: 'var(--c1)', v: f1(cap[i]), l: 'picking capacity' }], note: `Orders placed this hour wait ${f1(a.hrN[i] ? a.hrW[i] / a.hrN[i] : 0)} h to be picked` }) });
+  } else if (c.k === 'stock') {
+    const tot = Array.from({ length: WEEKS }, (_, i) => S.A[i + 1].split * 100), per = FCN.map((_n, f) => Array.from({ length: WEEKS }, (_, i) => S.A[i + 1].splitH[f] / S.A[i + 1].homeN[f] * 100)), mx = niceMax(Math.max(...per.flat()) * 1.1);
+    legend(host, [{ n: 'Whole network', c: 'var(--c2)' }, { n: 'Each warehouse', c: 'var(--c5)' }], true);
+    lineChart(host, w, { x: tot.map((_, i) => 'W' + (i + 1)), ymin: 0, ymax: mx, yfmt: v => v + '%', H: 280, sel: S.wk - 1, marks: [8], label: 'Split order share by week', onPick: i => setWeek(i + 1),
+      series: per.map(p => ({ color: 'var(--c5)', vals: p, w: 1.5, op: .8 })).concat([{ color: 'var(--c2)', vals: tot, w: 3, end: f1(tot[WEEKS - 1]) + '%' }]),
+      tip: i => ({ title: `Week ${i + 1}`, rows: [{ c: 'var(--c2)', v: f1(tot[i]) + '%', l: 'network split rate' }].concat(FCN.map((n, f) => ({ c: 'var(--c5)', v: f1(per[f][i]) + '%', l: n }))), note: i === 8 ? '1,800 new products spread stock thinner' : 'Click to select this week' }) });
+  } else if (c.k === 'handoff') {
+    const v = Array.from({ length: 24 }, (_, i) => a.pkN[i] ? a.pkT[i] / a.pkN[i] : 0), mx = niceMax(Math.max(...v) * 1.1), H = 280, m = { l: 44, r: 10, t: 14, b: 30 }, iw = w - m.l - m.r, ih = H - m.t - m.b, Y = q => m.t + ih - q / mx * ih;
+    legend(host, [{ n: 'Hours waiting for the truck', c: 'var(--c3)' }]);
+    const svg = el('svg', { viewBox: `0 0 ${w} ${H}`, width: w, height: H, role: 'img', 'aria-label': 'Truck wait by pack hour' }, host); gridY(svg, m, iw, ih, Y, mx, 4, q => q + ' h');
+    const slot = iw / 24, bw = Math.min(24, slot - 3);
+    v.forEach((q, i) => { const cx = m.l + slot * i + slot / 2; if (i % 2 === 0) el('text', { x: cx, y: H - 8, 'text-anchor': 'middle' }, svg, pad(i)); if (!a.pkN[i]) return;
+      const r = el('path', { d: `M${cx - bw / 2} ${Y(0)}V${Y(q) + 4}Q${cx - bw / 2} ${Y(q)} ${cx - bw / 2 + 4} ${Y(q)}H${cx + bw / 2 - 4}Q${cx + bw / 2} ${Y(q)} ${cx + bw / 2} ${Y(q) + 4}V${Y(0)}Z`, fill: 'var(--c3)', tabindex: 0, 'aria-label': `Packed at ${pad(i)}:00, waits ${f1(q)} hours` }, svg);
+      bindTip(r, e => { r.setAttribute('opacity', .8); showTip(e, `Packed ${pad(i)}:00 to ${pad(i + 1)}:00`, [{ c: 'var(--c3)', v: f1(q) + ' h', l: 'average wait for the truck' }, { v: num(a.pkN[i]), l: 'parcels packed this hour' }]); }); r.addEventListener('pointerleave', () => r.setAttribute('opacity', 1)); });
+    const tx = m.l + slot * a.truck; el('line', { x1: tx, x2: tx, y1: m.t, y2: m.t + ih, stroke: 'var(--ink)', 'stroke-width': 2 }, svg); el('text', { x: tx - 6, y: m.t + 12, 'text-anchor': 'end', style: 'font-weight:800;fill:var(--ink)' }, svg, `Last truck ${pad(a.truck)}:00`);
+  } else {
+    const idx = a.load.map((v, z) => [v, z]).sort((x, y) => y[0] - x[0]).slice(0, 12), mx = niceMax(Math.max(1.2, idx[0][0] * 1.08));
+    barsH(host, w, { ml: w < 420 ? 96 : 120, max: mx, ref: 1, refLabel: 'Full', xfmt: v => Math.round(v * 100) + '%', rowH: 26, bh: 14, ticks: Math.round(mx / .2) > 8 ? 4 : Math.round(mx / .2), label: 'Driver load in the 12 busiest zones', onClick: r => { S.zone = idx[r][1]; renderZone(); drawChart('map'); $('#s3').scrollIntoView({ behavior: 'smooth' }); },
+      rows: idx.map(([v, z]) => ({ label: ZONES[z].name, vals: [{ v, c: v > 1 ? 'var(--c4)' : 'var(--c5)', txt: pct(v, 0), tip: { title: ZONES[z].name, rows: [{ c: 'var(--c4)', v: pct(v, 0), l: 'driver load' }, { v: num(a.zn[z]), l: 'orders this week' }, { v: ['Urban', 'Suburban', 'Rural'][ZONES[z].cls], l: 'zone type' }], note: 'Click to open on the map' } }] })) });
+  }
+}, () => { const a = A(), c = CAUSE[S.tab];
+  if (c.k === 'staff') return { head: ['Hour', 'Orders/hour', 'Capacity/hour', 'Avg pick wait (h)'], rows: hrs.map((x, i) => [x + ':00', f1(a.hrN[i] / 7), f1(FCN.reduce((s, _n, f) => s + hourCap(f, R().W, { align: 0 })[i], 0)), f1(a.hrN[i] ? a.hrW[i] / a.hrN[i] : 0)]) };
+  if (c.k === 'stock') return { head: ['Week', 'Network split %'].concat(FCN), rows: Array.from({ length: WEEKS }, (_, i) => [i + 1, f1(S.A[i + 1].split * 100)].concat(FCN.map((_n, f) => f1(S.A[i + 1].splitH[f] / S.A[i + 1].homeN[f] * 100)))) };
+  if (c.k === 'handoff') return { head: ['Pack hour', 'Parcels', 'Avg truck wait (h)'], rows: hrs.map((x, i) => [x + ':00', a.pkN[i], f1(a.pkN[i] ? a.pkT[i] / a.pkN[i] : 0)]) };
+  return { head: ['Zone', 'Warehouse', 'Orders', 'Driver load'], rows: ZONES.map(z => [z.name, FCN[z.home], a.zn[z.id], pct(a.load[z.id], 0)]).sort((x, y) => parseFloat(y[3]) - parseFloat(x[3])).slice(0, 20) }; });
+
+/* ---------- 5 · fix-it console ---------- */
+const LEVERS = [
+  { k: 'align', n: 'Match pickers to demand', c: 'var(--c1)', eff: 'Low effort · roster change', d: 'Move shift hours from the quiet morning to the lunch and evening peaks.', min: 0, max: 100, step: 10, fmt: v => v + '% aligned' },
+  { k: 'rebalance', n: 'Stock where customers are', c: 'var(--c2)', eff: 'Medium effort · replenishment rules', d: 'Forward-place fast movers and new lines so fewer orders need two warehouses.', min: 0, max: 90, step: 10, fmt: v => v + '% fewer splits' },
+  { k: 'truck', n: 'Later last pickup', c: 'var(--c3)', eff: 'Low effort · carrier contract', d: 'Push the carrier’s last pickup later, and optionally add a Sunday collection.', min: 14, max: 21, step: 1, fmt: v => pad(v) + ':00', sunday: true },
+  { k: 'drivers', n: 'Add drivers where load is highest', c: 'var(--c4)', eff: 'High effort · hiring', d: 'Each driver adds capacity to the most overloaded zone, with a few quiet zones lending stops.', min: 0, max: 12, step: 1, fmt: v => '+' + v + ' drivers' },
+  { k: 'alert', n: 'Warn customers early', c: 'var(--ink2)', eff: 'Low effort · notifications', d: 'Message customers about a delay before they find out. Halves complaints from those reached.', min: 0, max: 100, step: 10, fmt: v => v + '% of customers' }];
+const PRESETS = [
+  { n: 'Today (no change)', p: { align: 0, rebalance: 0, truck: null, sunday: false, drivers: 0, alert: 0 } },
+  { n: 'Quick wins, no hiring', p: { align: 70, rebalance: 0, truck: 18, sunday: true, drivers: 0, alert: 70 } },
+  { n: 'Balanced plan', p: { align: 70, rebalance: 50, truck: 18, sunday: true, drivers: 4, alert: 70 } },
+  { n: 'Full programme', p: { align: 100, rebalance: 90, truck: 20, sunday: true, drivers: 8, alert: 100 } }];
+const levObj = () => ({ align: S.lev.align / 100, rebalance: S.lev.rebalance / 100, truck: S.lev.truck === R().W.truck ? null : S.lev.truck, sunday: S.lev.sunday, drivers: S.lev.drivers, alert: S.lev.alert / 100 });
+function applyPreset(p) { S.lev = Object.assign({}, p); if (S.lev.truck == null) S.lev.truck = R().W.truck; syncLevers(); runSim(true); }
+function renderPresets() { const b = $('#presets'); b.replaceChildren(); PRESETS.forEach((p, i) => { const c = h('button', 'chip' + (i === 2 ? ' go' : ''), p.n, b); c.type = 'button'; c.onclick = () => applyPreset(p.p); }); }
+function buildLevers() {
+  const box = $('#levers'); box.replaceChildren();
+  LEVERS.forEach(L => { const d = h('div', 'lever', null, box); d.style.setProperty('--lc', L.c); const hd = h('header', '', null, d); const lab = h('h4', '', L.n, hd); lab.id = 'lh-' + L.k; const out = h('output', '', '', hd); out.id = 'lo-' + L.k;
+    h('p', '', L.d, d); const inp = h('input', '', null, d); inp.type = 'range'; inp.min = L.min; inp.max = L.max; inp.step = L.step; inp.id = 'li-' + L.k; inp.setAttribute('aria-labelledby', 'lh-' + L.k);
+    inp.addEventListener('input', () => { S.lev[L.k] = +inp.value; syncLevers(); runSim(false); }); inp.addEventListener('change', () => runSim(true));
+    if (L.sunday) { const s = h('label', 'sw', null, d); const t = h('input', 'toggle', null, s); t.type = 'checkbox'; t.id = 'ls'; t.addEventListener('change', () => { S.lev.sunday = t.checked; syncLevers(); runSim(true); }); s.append('Add a Sunday pickup'); }
+    h('div', 'eff', L.eff, d); });
+}
+function syncLevers() {
+  const W0 = R().W; if (S.lev.truck == null) S.lev.truck = W0.truck;
+  LEVERS.forEach(L => { const inp = $('#li-' + L.k); if (L.k === 'truck') { inp.min = Math.min(14, W0.truck); } inp.value = S.lev[L.k]; inp.style.setProperty('--p', (S.lev[L.k] - inp.min) / (inp.max - inp.min) * 100 + '%'); $('#lo-' + L.k).textContent = L.fmt(S.lev[L.k]); });
+  $('#ls').checked = S.lev.sunday;
+}
+let simTimer = 0, gainTimer = 0;
+function runSim(full) {
+  cancelAnimationFrame(simTimer); simTimer = requestAnimationFrame(() => {
+    const lv = levObj(), Ow = O(), Rb = R(), a = A(), r2 = simulate(Ow, lv), ot2 = onTime(r2); let c2 = 0, sl = 0, nl = 0; for (let i = 0; i < r2.n; i++) { c2 += r2.comp[i]; if (r2.late[i] > 0) { sl += r2.late[i]; nl++; } }
+    const b = $('#big2'); b.replaceChildren(); const d1 = (ot2 - a.ot) * 100, cpk2 = c2 / r2.n * 1000, avoided = a.late - nl;
+    [['On-time delivery', pct(ot2), (d1 >= 0 ? '+' : '') + f1(d1) + ' pts vs today (' + pct(a.ot) + ')', d1 > 0.05], ['Complaints per 1,000', f1(cpk2), (cpk2 <= a.cpk ? '' : '+') + f1(cpk2 - a.cpk) + ' vs today (' + f1(a.cpk) + ')', cpk2 < a.cpk - .05], ['Late parcels avoided', num(avoided), 'per week, out of ' + num(a.late) + ' late today', avoided > 0], ['Average lateness', f1(nl ? sl / nl : 0) + ' h', 'of the parcels still late (today ' + f1(a.avgL) + ' h)', nl && sl / nl < a.avgL - .05]].forEach(([l, v, s, up]) => { const x = h('div', 'bigstat', null, b); h('small', '', l, x); const bb = h('b', up ? 'up' : '', v, x); h('span', '', s, x); });
+    if (full) { clearTimeout(gainTimer); gainTimer = setTimeout(() => { computeGains(); drawChart('water'); }, 30); }
+  });
+}
+let GAINS = [];
+function computeGains() {
+  const lv = levObj(), Ow = O(), base = A().ot, seq = [['staff', ['align']], ['stock', ['rebalance']], ['handoff', ['truck', 'sunday']], ['routes', ['drivers']]], cur = { align: 0, rebalance: 0, truck: null, sunday: false, drivers: 0, alert: 0 }; let prev = base; GAINS = [];
+  seq.forEach(([k, keys], i) => { keys.forEach(x => cur[x] = lv[x]); const o = onTime(simulate(Ow, Object.assign({}, cur))); GAINS.push({ c: CAUSE.find(c => c.k === k), g: (o - prev) * 100 }); prev = o; });
+  GAINS.total = (prev - base) * 100;
+}
+reg('water', (host, w) => {
+  if (!GAINS.length) computeGains(); const mx = niceMax(Math.max(2, ...GAINS.map(x => x.g), GAINS.total) * 1.1);
+  const rows = GAINS.map(x => ({ label: x.c.s, vals: [{ v: Math.max(0, x.g), c: x.c.c, txt: '+' + f1(x.g) + ' pts', tip: { title: x.c.n, rows: [{ c: x.c.c, v: '+' + f1(x.g) + ' pts', l: 'on-time points added by this lever' }], note: 'Levers are applied in this order, so each gain is on top of the previous ones' } }] }));
+  rows.push({ label: 'Total', vals: [{ v: Math.max(0, GAINS.total), c: 'var(--ink)', txt: '+' + f1(GAINS.total) + ' pts', tip: { title: 'All levers together', rows: [{ c: 'var(--ink)', v: '+' + f1(GAINS.total) + ' pts', l: 'on-time points' }] } }] });
+  barsH(host, w, { ml: 84, max: mx, xfmt: v => '+' + Math.round(v * 10) / 10, rowH: 38, bh: 16, label: 'On-time points added by each lever', rows });
+  const t = $('#r-water'); t.replaceChildren(); const best = GAINS.slice().sort((x, y) => y.g - x.g)[0]; t.append(GAINS.total > .05 ? 'Biggest contribution in this mix: ' : 'Move a slider or choose a preset to see the effect. '); if (GAINS.total > .05) h('b', '', `${best.c.n} (+${f1(best.g)} pts)`, t);
+}, () => ({ head: ['Lever', 'On-time points added'], rows: GAINS.map(x => [x.c.n, '+' + f1(x.g)]).concat([['All levers', '+' + f1(GAINS.total || 0)]]) }));
+const planAt = w => { const f = Math.min(1, (w - 12) / 4); return { align: .7 * f, rebalance: .5 * f, truck: f >= .5 ? 18 : null, sunday: f >= .5, drivers: Math.round(4 * f), alert: .7 * f }; };
+function computeOutlook() {
+  let w = WEEKS + 1; S.out = { base: [], plan: [], done: false };
+  (function step() {
+    if (w > 24) { S.out.done = true; drawChart('outlook'); return; }
+    const Ow = genWeek(w), b = simulate(Ow, {}), p = simulate(Ow, planAt(w)); let c0 = 0, c1 = 0; for (let i = 0; i < b.n; i++) { c0 += b.comp[i]; c1 += p.comp[i]; }
+    S.out.base.push({ ot: onTime(b) * 100, cpk: c0 / b.n * 1000 }); S.out.plan.push({ ot: onTime(p) * 100, cpk: c1 / p.n * 1000 }); w++; drawChart('outlook'); setTimeout(step, 25);
+  })();
+}
+reg('outlook', (host, w) => {
+  const hist = ontimes(), o = S.out; if (!o || !o.base.length) { h('p', 'sub', 'Simulating the next 12 weeks…', host); return; }
+  const k = o.base.length, xs = Array.from({ length: 24 }, (_, i) => 'W' + (i + 1)), pad0 = Array(WEEKS - 1).fill(null), last = hist[WEEKS - 1];
+  const sBase = pad0.concat([last], o.base.map(x => x.ot), Array(12 - k).fill(null)), sPlan = pad0.concat([last], o.plan.map(x => x.ot), Array(12 - k).fill(null)), sHist = hist.concat(Array(12).fill(null));
+  const all = hist.concat(o.base.map(x => x.ot), o.plan.map(x => x.ot)), lo = Math.floor(Math.min(...all) / 20) * 20;
+  legend(host, [{ n: 'Actual', c: 'var(--ink2)' }, { n: 'Do nothing', c: 'var(--c2)' }, { n: 'Balanced plan, phased in over weeks 13 to 16', c: 'var(--c3)' }], true);
+  const endB = k === 12 ? f1(o.base[11].ot) + '%' : null, endP = k === 12 ? f1(o.plan[11].ot) + '%' : null;
+  lineChart(host, w, { x: xs, every: w < 560 ? 2 : 1, ymin: Math.max(0, lo), ymax: 100, ticks: Math.max(1, Math.round((100 - Math.max(0, lo)) / 20)), yfmt: v => Math.round(v) + '%', H: 280, label: 'On-time percentage, history and 12 week outlook',
+    series: [{ color: 'var(--ink2)', vals: sHist }, { color: 'var(--c2)', vals: sBase, end: endB }, { color: 'var(--c3)', vals: sPlan, end: endP }],
+    tip: i => { if (i < WEEKS) return { title: 'Week ' + (i + 1), rows: [{ c: 'var(--ink2)', v: f1(hist[i]) + '%', l: 'actual on time' }] }; const j = i - WEEKS; if (j >= k) return { title: 'Week ' + (i + 1), rows: [], note: 'Still simulating…' }; return { title: 'Week ' + (i + 1) + ' (outlook)', rows: [{ c: 'var(--c2)', v: f1(o.base[j].ot) + '%', l: 'do nothing' }, { c: 'var(--c3)', v: f1(o.plan[j].ot) + '%', l: 'balanced plan' }], note: `Complaints per 1,000: ${f1(o.base[j].cpk)} → ${f1(o.plan[j].cpk)}` }; } });
+  const t = $('#r-outlook'); t.replaceChildren();
+  if (k === 12) { t.append('By week 24, doing nothing leaves '); h('b', '', f1(o.base[11].ot) + '%', t); t.append(' of parcels on time. The balanced plan holds '); h('b', '', f1(o.plan[11].ot) + '%', t); t.append(' and cuts complaints from '); h('b', '', f1(o.base[11].cpk), t); t.append(' to '); h('b', '', f1(o.plan[11].cpk), t); t.append(' per 1,000.'); } else t.textContent = 'Simulating weeks 13 to 24…';
+}, () => { const o = S.out; const rows = Array.from({ length: WEEKS }, (_, i) => [i + 1, f1(S.A[i + 1].ot * 100), '', '']); if (o) o.base.forEach((x, j) => rows.push([WEEKS + 1 + j, '', f1(x.ot), f1(o.plan[j].ot)])); return { head: ['Week', 'Actual %', 'Do nothing %', 'Balanced plan %'], rows }; });
+
+/* ---------- 6 · plan ---------- */
+const ACTS = {
+  staff: { t: 'Re-roster pickers to the demand curve', b: ['Shift picker hours from 06:00 to 10:00 into the 11:00 to 14:00 and 19:00 to 22:00 peaks', 'Use a rolling 4-week demand forecast to build next week’s roster', 'Cover absence with a flex pool that can be called in for peak blocks'], e: 'Low effort', o: 'Warehouse ops', w: '2 weeks' },
+  handoff: { t: 'Restore a late last pickup and add Sunday collection', b: ['Renegotiate the last carrier pickup back to 18:00, or add a second late pickup', 'Add a Sunday pickup so weekend orders stop queuing until Monday', 'Pack to the truck schedule: pull forward orders that would just miss it'], e: 'Low effort', o: 'Logistics', w: '3 weeks' },
+  stock: { t: 'Put stock closer to demand', b: ['Set safety stock per warehouse from local demand, not national averages', 'Seed new products in all four warehouses before launch', 'Alert buyers when a warehouse’s split-order rate passes 8%'], e: 'Medium effort', o: 'Inventory planning', w: '6 weeks' },
+  routes: { t: 'Add drivers where load is above 100%', b: ['Add capacity in the 6 to 10 most overloaded zones first', 'Let quiet zones lend stops on surge days', 'Pre-book surge drivers for sale events and Monday peaks'], e: 'High effort', o: 'Last-mile ops', w: '4 to 8 weeks' } };
+function renderPlan() {
+  const g = idealGain(S.wk), box = $('#planCards'); box.replaceChildren();
+  Object.keys(ACTS).map(k => [k, g[k]]).sort((a, b) => b[1] - a[1]).forEach(([k, v]) => { const x = ACTS[k], c = CAUSE.find(z => z.k === k), d = h('article', 'act', null, box); d.style.borderTop = '6px solid ' + c.c; h('h3', '', x.t, d);
+    const m = h('div', 'meta', null, d); [x.e, x.o, 'Impact in ' + x.w].forEach(t => h('span', 'tag', t, m)); const gg = h('div', 'gain', '+' + f1(v) + ' pts on-time', d); const ul = h('ul', '', null, d); x.b.forEach(t => h('li', '', t, ul)); });
+  const d = h('article', 'act', null, box); d.style.borderTop = '6px solid var(--ink2)'; h('h3', '', 'Warn customers about delays before they chase you', d); const m = h('div', 'meta', null, d); ['Low effort', 'Customer care', 'Impact in 1 week'].forEach(t => h('span', 'tag', t, m));
+  h('div', 'gain', '−' + Math.round(g.alertCut * 100) + '% complaints', d); const ul = h('ul', '', null, d); ['Message customers as soon as the AI predicts a late parcel', 'Give a new delivery window, not a generic apology', 'Track complaints per 1,000 as the success metric'].forEach(t => h('li', '', t, ul));
+  const a = A(), a1 = S.A[1], rows = [
+    ['On-time delivery', pct(a.ot), '92% or more', a.ot >= .92 ? 2 : a.ot >= .85 ? 1 : 0],
+    ['Pick wait, peak hours', f1(a.peakWait) + ' h', '2 h or less', a.peakWait <= 2 ? 2 : a.peakWait <= 4 ? 1 : 0],
+    ['Split-order rate', pct(a.split, 1), '7% or less', a.split <= .07 ? 2 : a.split <= .1 ? 1 : 0],
+    ['Parcels missing the same-day truck', pct(a.missP, 0), pct(a1.missP + .03, 0) + ' or less (week 1 + 3 pts)', a.missP <= a1.missP + .03 ? 2 : a.missP <= a1.missP + .1 ? 1 : 0],
+    ['Busiest zone driver load', pct(Math.max(...a.load), 0), '100% or less', Math.max(...a.load) <= 1 ? 2 : Math.max(...a.load) <= 1.15 ? 1 : 0],
+    ['Picker absence', pct(a.abs, 1), '8% or less', a.abs <= .08 ? 2 : a.abs <= .12 ? 1 : 0]];
+  const t = $('#radar'); t.replaceChildren(); const hd = h('tr', '', null, h('thead', '', null, t)); ['Signal', 'Week ' + S.wk, 'Alert when worse than', 'Status'].forEach(x => h('th', '', x, hd)); const tb = h('tbody', '', null, t);
+  rows.forEach(r => { const tr = h('tr', '', null, tb); h('td', '', r[0], tr); const v = h('td', '', null, tr); h('b', '', r[1], v); h('td', '', r[2], tr); const s = h('td', '', null, tr), pill = h('span', 'st', null, s); pill.style.setProperty('--sc', ['var(--crit)', 'var(--warn)', 'var(--good)'][r[3]]); const ic = h('i', '', ['!', '~', '✓'][r[3]], pill); if (r[3] === 1) ic.style.color = '#12203a'; pill.append(['Act now', 'Watch', 'Healthy'][r[3]]); });
+}
+
+/* ---------- orchestration ---------- */
+function renderAll(keepScroll) {
+  renderFilters(); renderHero(); renderDomains(); renderTracker(); renderMapTabs(); renderZone(); renderFcs(); renderTabs(); renderPlan(); renderEvid(); renderMovers();
+  S.lev.truck = S.lev.truck == null ? R().W.truck : S.lev.truck; if (S.lev.truck < Math.min(14, R().W.truck)) S.lev.truck = R().W.truck; syncLevers();
+  ['trend', 'stack', 'stage', 'map'].forEach(drawChart); runSim(true); drawChart('outlook');
+  $$('.viz').forEach(v => { v.classList.add('busy'); setTimeout(() => v.classList.remove('busy'), 180); });
+}
+function start() {
+  $('#bootBar').style.width = '100%'; $('#bootT').textContent = 'Diagnosis ready'; bootDom.forEach(d => d.classList.add('on'));
+  renderPresets(); buildLevers(); S.lev.truck = R().W.truck;
+  $$('.tbl[data-t]').forEach(b => b.onclick = () => { const id = b.dataset.t; S.tbl[id] = !S.tbl[id]; b.setAttribute('aria-pressed', String(!!S.tbl[id])); b.textContent = S.tbl[id] ? 'Chart' : 'Table'; drawChart(id); });
+  applyPreset(PRESETS[2].p); renderAll();
+  setTimeout(() => { $('#boot').classList.add('gone'); }, 300); setTimeout(() => { $('#boot').style.display = 'none'; }, 900);
+  setTimeout(computeOutlook, 600);
+  let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(drawAll, 120); });
+  if (window.ResizeObserver) { let first = true; new ResizeObserver(() => { if (first) { first = false; return; } clearTimeout(rz); rz = setTimeout(drawAll, 120); }).observe($('main')); }
+  // theme
+  const root = document.documentElement; $('#theme').onclick = () => { const dark = root.dataset.theme ? root.dataset.theme === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches; root.dataset.theme = dark ? 'light' : 'dark'; };
+  // rail progress
+  const stops = $$('.stop'), secs = ['s1', 's2', 's3', 's4', 's5', 's6'].map(id => document.getElementById(id));
+  const upd = () => { let act = 0; secs.forEach((s, i) => { if (s.getBoundingClientRect().top < innerHeight * .4) act = i; }); stops.forEach((s, i) => { s.classList.toggle('on', i === act); s.classList.toggle('done', i < act); });
+    const tr = $('#track'), p = stops[act]; if (getComputedStyle($('#prog')).display !== 'none') $('#prog').style.height = Math.max(0, p.offsetTop + 15 - 18) + 'px'; };
+  window.addEventListener('scroll', upd, { passive: true }); upd();
+}
+boot();
+})();
+
+</script>
+</body>
+</html>
